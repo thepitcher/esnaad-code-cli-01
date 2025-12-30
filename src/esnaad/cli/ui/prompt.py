@@ -35,7 +35,7 @@ def create_prompt_session() -> PromptSession:
 
 async def get_user_input(
     console: Console,
-    prompt_text: str = "You: ",
+    prompt_text: str = "> ",
 ) -> str | None:
     """
     Get input from the user.
