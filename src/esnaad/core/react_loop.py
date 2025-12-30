@@ -1,0 +1,288 @@
+"""ReAct (Reasoning + Acting) loop implementation."""
+
+import asyncio
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable, Awaitable
+
+import structlog
+
+from esnaad.llm.client import LLMClient, ChatResponse, ChatChunk
+from esnaad.llm.streaming import StreamingHandler
+from esnaad.models.tool_call import ToolCall, ToolResult
+from esnaad.models.result import AgentResult, AgentStatus
+from esnaad.exceptions import MaxIterationsError, AgentTimeoutError
+
+logger = structlog.get_logger(__name__)
+
+
+@dataclass
+class ReActConfig:
+    """Configuration for the ReAct loop."""
+
+    max_iterations: int = 50
+    timeout_seconds: int = 300
+    model: str = "gpt-4"
+    temperature: float = 0.7
+    max_tokens: int = 4096
+    stream: bool = False  # Enable streaming responses
+
+
+@dataclass
+class ReActState:
+    """State of the ReAct loop."""
+
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    iteration: int = 0
+    tool_calls_count: int = 0
+    start_time: float = field(default_factory=time.time)
+    last_response: ChatResponse | None = None
+
+
+class ReActLoop:
+    """
+    Generic ReAct loop implementation.
+
+    Implements the Reason → Act → Observe cycle:
+    1. Send messages to LLM
+    2. If LLM returns tool calls, execute them
+    3. Add tool results to messages
+    4. Repeat until LLM returns final answer or limits reached
+    """
+
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        config: ReActConfig,
+        tool_executor: Callable[[ToolCall], Awaitable[ToolResult]],
+        tools_schema: list[dict[str, Any]],
+        on_thinking: Callable[[str], Awaitable[None] | None] | None = None,
+        on_tool_call: Callable[[ToolCall], Awaitable[None] | None] | None = None,
+        on_tool_result: Callable[[ToolResult], Awaitable[None] | None] | None = None,
+        on_content_delta: Callable[[str], Awaitable[None] | None] | None = None,
+    ) -> None:
+        """
+        Initialize the ReAct loop.
+
+        Args:
+            llm_client: LLM client for completions
+            config: Loop configuration
+            tool_executor: Async function to execute tool calls
+            tools_schema: OpenAI-format tool schemas
+            on_thinking: Callback for thinking/reasoning output (complete)
+            on_tool_call: Callback when a tool is called
+            on_tool_result: Callback when a tool returns
+            on_content_delta: Callback for streaming content deltas
+        """
+        self.llm = llm_client
+        self.config = config
+        self.tool_executor = tool_executor
+        self.tools_schema = tools_schema
+        self.on_thinking = on_thinking
+        self.on_tool_call = on_tool_call
+        self.on_tool_result = on_tool_result
+        self.on_content_delta = on_content_delta
+
+    async def run(
+        self,
+        initial_messages: list[dict[str, Any]],
+    ) -> AgentResult:
+        """
+        Run the ReAct loop.
+
+        Args:
+            initial_messages: Starting messages (system + user)
+
+        Returns:
+            Final agent result
+        """
+        state = ReActState(messages=list(initial_messages))
+
+        logger.info(
+            "Starting ReAct loop",
+            max_iterations=self.config.max_iterations,
+            timeout=self.config.timeout_seconds,
+        )
+
+        try:
+            while state.iteration < self.config.max_iterations:
+                # Check timeout
+                elapsed = time.time() - state.start_time
+                if elapsed > self.config.timeout_seconds:
+                    raise AgentTimeoutError(
+                        operation="ReAct loop",
+                        timeout=self.config.timeout_seconds,
+                    )
+
+                # Execute one step
+                result = await self._step(state)
+
+                if result is not None:
+                    # Loop complete
+                    return result
+
+                state.iteration += 1
+
+            # Max iterations reached
+            raise MaxIterationsError(
+                iterations=state.iteration,
+                max_iterations=self.config.max_iterations,
+            )
+
+        except MaxIterationsError:
+            logger.warning(
+                "Max iterations reached",
+                iterations=state.iteration,
+            )
+            return AgentResult.max_iterations(
+                iterations=state.iteration,
+                max_iterations=self.config.max_iterations,
+                partial_content=self._get_last_content(state),
+                execution_time=time.time() - state.start_time,
+                tool_calls_count=state.tool_calls_count,
+            )
+
+        except AgentTimeoutError as e:
+            logger.warning(
+                "Timeout reached",
+                timeout=e.timeout,
+            )
+            return AgentResult.timeout(
+                timeout=e.timeout,
+                iterations=state.iteration,
+                partial_content=self._get_last_content(state),
+                tool_calls_count=state.tool_calls_count,
+            )
+
+        except Exception as e:
+            logger.exception("ReAct loop error")
+            return AgentResult.error(
+                error=str(e),
+                iterations=state.iteration,
+                execution_time=time.time() - state.start_time,
+                tool_calls_count=state.tool_calls_count,
+            )
+
+    async def _step(self, state: ReActState) -> AgentResult | None:
+        """
+        Execute one ReAct step.
+
+        Returns AgentResult if complete, None to continue.
+        """
+        logger.debug(
+            "ReAct step",
+            iteration=state.iteration,
+            message_count=len(state.messages),
+        )
+
+        if self.config.stream:
+            response = await self._step_streaming(state)
+        else:
+            response = await self._step_non_streaming(state)
+
+        state.last_response = response
+
+        # Check for thinking/reasoning output (non-streaming only)
+        if not self.config.stream and response.content and self.on_thinking:
+            result = self.on_thinking(response.content)
+            if hasattr(result, "__await__"):
+                await result
+
+        # Check if we're done (no tool calls)
+        if not response.has_tool_calls:
+            logger.info(
+                "ReAct loop complete",
+                iterations=state.iteration,
+                finish_reason=response.finish_reason,
+            )
+            return AgentResult.success(
+                content=response.content or "",
+                iterations=state.iteration,
+                execution_time=time.time() - state.start_time,
+                tool_calls_count=state.tool_calls_count,
+            )
+
+        # Add assistant message with tool calls
+        assistant_msg = {"role": "assistant", "content": response.content}
+        if response.tool_calls:
+            assistant_msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.name,
+                        "arguments": str(tc.arguments),
+                    },
+                }
+                for tc in response.tool_calls
+            ]
+        state.messages.append(assistant_msg)
+
+        # Execute tool calls (skip callback for streaming since handler already called it)
+        for tool_call in response.tool_calls:
+            state.tool_calls_count += 1
+
+            # Callback (only for non-streaming)
+            if not self.config.stream and self.on_tool_call:
+                result = self.on_tool_call(tool_call)
+                if hasattr(result, "__await__"):
+                    await result
+
+            # Execute
+            tool_result = await self.tool_executor(tool_call)
+
+            # Callback
+            if self.on_tool_result:
+                result = self.on_tool_result(tool_result)
+                if hasattr(result, "__await__"):
+                    await result
+
+            # Add result to messages
+            state.messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": tool_result.to_content(),
+            })
+
+        return None  # Continue loop
+
+    async def _step_non_streaming(self, state: ReActState) -> ChatResponse:
+        """Execute non-streaming LLM call."""
+        return await self.llm.chat_completion(
+            messages=state.messages,
+            model=self.config.model,
+            tools=self.tools_schema if self.tools_schema else None,
+            temperature=self.config.temperature,
+            max_tokens=self.config.max_tokens,
+            stream=False,
+        )
+
+    async def _step_streaming(self, state: ReActState) -> ChatResponse:
+        """Execute streaming LLM call."""
+        stream = await self.llm.chat_completion(
+            messages=state.messages,
+            model=self.config.model,
+            tools=self.tools_schema if self.tools_schema else None,
+            temperature=self.config.temperature,
+            max_tokens=self.config.max_tokens,
+            stream=True,
+        )
+
+        # Process stream with handler
+        handler = StreamingHandler(
+            on_content=self.on_content_delta,
+            on_tool_call=self.on_tool_call,
+        )
+        return await handler.process(stream)
+
+    def _get_last_content(self, state: ReActState) -> str | None:
+        """Get the last assistant content from state."""
+        if state.last_response and state.last_response.content:
+            return state.last_response.content
+
+        # Look through messages
+        for msg in reversed(state.messages):
+            if msg.get("role") == "assistant" and msg.get("content"):
+                return msg["content"]
+
+        return None
