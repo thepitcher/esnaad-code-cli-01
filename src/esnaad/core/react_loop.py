@@ -12,6 +12,7 @@ from esnaad.llm.streaming import StreamingHandler
 from esnaad.models.tool_call import ToolCall, ToolResult
 from esnaad.models.result import AgentResult, AgentStatus
 from esnaad.exceptions import MaxIterationsError, AgentTimeoutError
+from esnaad.tools.registry import ToolRegistry
 
 logger = structlog.get_logger(__name__)
 
@@ -217,6 +218,26 @@ class ReActLoop:
                     finish_reason=response.finish_reason,
                     content_length=len(response.content) if response.content else 0,
                 )
+
+            # Retry if model returned empty response after tool calls
+            # This handles cases where the model stops without providing output
+            content_is_empty = not response.content or not response.content.strip()
+            has_previous_tool_calls = state.tool_calls_count > 0
+            retry_limit_not_reached = state.iteration < min(3, self.config.max_iterations - 1)
+
+            if content_is_empty and has_previous_tool_calls and retry_limit_not_reached:
+                logger.warning(
+                    "Model returned empty response after tool calls, prompting to continue",
+                    iteration=state.iteration,
+                    tool_calls_count=state.tool_calls_count,
+                )
+                # Add a prompt to encourage the model to provide output
+                state.messages.append({
+                    "role": "user",
+                    "content": "Please provide your analysis and response based on the tool results above.",
+                })
+                return None  # Continue loop
+
             logger.info(
                 "ReAct loop complete",
                 iterations=state.iteration,
@@ -246,7 +267,59 @@ class ReActLoop:
         state.messages.append(assistant_msg)
 
         # Execute tool calls (skip callback for streaming since handler already called it)
+        # Separate parallel-safe and sequential tools
+        parallel_calls: list[ToolCall] = []
+        sequential_calls: list[ToolCall] = []
+
         for tool_call in response.tool_calls:
+            tool = ToolRegistry.get(tool_call.name)
+            if tool and tool.parallel_safe and not tool.requires_lock:
+                parallel_calls.append(tool_call)
+            else:
+                sequential_calls.append(tool_call)
+
+        tool_results: dict[str, ToolResult] = {}
+
+        # Execute parallel-safe tools concurrently
+        if parallel_calls:
+            logger.debug(
+                "Executing tools in parallel",
+                count=len(parallel_calls),
+                tools=[tc.name for tc in parallel_calls],
+            )
+
+            # Fire callbacks for all parallel calls first
+            for tool_call in parallel_calls:
+                state.tool_calls_count += 1
+                if not self.config.stream and self.on_tool_call:
+                    result = self.on_tool_call(tool_call)
+                    if hasattr(result, "__await__"):
+                        await result
+
+            # Execute all in parallel
+            parallel_results = await asyncio.gather(
+                *[self.tool_executor(tc) for tc in parallel_calls],
+                return_exceptions=True,
+            )
+
+            # Process results
+            for tool_call, tool_result in zip(parallel_calls, parallel_results):
+                if isinstance(tool_result, Exception):
+                    tool_result = ToolResult.create_error(
+                        tool_call_id=tool_call.id,
+                        tool_name=tool_call.name,
+                        error=str(tool_result),
+                    )
+                tool_results[tool_call.id] = tool_result
+
+                # Result callback
+                if self.on_tool_result:
+                    result = self.on_tool_result(tool_result)
+                    if hasattr(result, "__await__"):
+                        await result
+
+        # Execute sequential tools one at a time
+        for tool_call in sequential_calls:
             state.tool_calls_count += 1
 
             # Callback (only for non-streaming)
@@ -257,6 +330,7 @@ class ReActLoop:
 
             # Execute
             tool_result = await self.tool_executor(tool_call)
+            tool_results[tool_call.id] = tool_result
 
             # Callback
             if self.on_tool_result:
@@ -264,7 +338,9 @@ class ReActLoop:
                 if hasattr(result, "__await__"):
                     await result
 
-            # Add result to messages
+        # Add all results to messages (in original order)
+        for tool_call in response.tool_calls:
+            tool_result = tool_results[tool_call.id]
             state.messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,

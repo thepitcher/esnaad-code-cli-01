@@ -114,10 +114,20 @@
 - [x] Rules inheritance to sub-agents
 - [x] Unit tests for RulesLoader (16 tests)
 
+#### Phase 10: UX Improvements & Bug Fixes ✅ COMPLETE
+- [x] SSL verification skip option (`verify_ssl` setting)
+- [x] Thinking spinner during LLM requests
+- [x] Claude Code orange theme (#E57B3A)
+- [x] Simplified input prompt (">")
+- [x] Dual API format support (OpenAI + Anthropic)
+- [x] Pydantic v2 compatibility fixes
+- [x] Parallel tool execution for `parallel_safe` tools
+- [x] Empty response retry logic
+
 ## Project Structure
 
 ```
-esnaad-code-03/
+esnaad-code-04/
 ├── pyproject.toml              # Project config, dependencies
 ├── README.md                   # User documentation
 ├── CLAUDE.md                   # This file - AI context
@@ -242,7 +252,7 @@ tests/                          # Test Suite
 
 ```bash
 # Install in development mode
-cd c:\Workspace\Claude\esnaad-code-03
+cd c:\Workspace\Claude\esnaad-code-04
 uv pip install -e .
 
 # Or with pip
@@ -293,11 +303,18 @@ python test_clarification.py
 Set in `.env` or environment:
 
 ```bash
+# General
 ESNAAD_DEBUG=false                           # Debug mode (shows logs)
 ESNAAD_LOG_LEVEL=INFO                        # Log level when debug=true
+ESNAAD_WORKING_DIRECTORY=C:\Projects\my-project  # Working directory
+
+# LLM Settings
 ESNAAD_LLM__BASE_URL=http://localhost:3000/api
 ESNAAD_LLM__API_KEY=your-key
 ESNAAD_LLM__MODEL=gpt-4
+ESNAAD_LLM__VERIFY_SSL=true                  # Set to false to skip TLS verification
+
+# Orchestrator
 ESNAAD_ORCHESTRATOR__MAX_ITERATIONS=50
 ESNAAD_ORCHESTRATOR__TIMEOUT_SECONDS=300
 ```
@@ -310,6 +327,9 @@ ESNAAD_ORCHESTRATOR__TIMEOUT_SECONDS=300
 4. **File locking**: Read/write locks for concurrent access
 5. **Stateless sub-agents**: Fresh context per subtask
 6. **Structured errors**: Exception hierarchy with recoverable flag
+7. **Parallel tool execution**: Tools marked `parallel_safe=True` execute concurrently
+8. **Dual API format**: Supports both OpenAI and Anthropic response formats
+9. **Automatic retry**: Empty responses after tool calls trigger automatic retry
 
 ## Dependencies
 
@@ -378,6 +398,29 @@ No major known issues. All core features implemented.
 - Rules feature allows project-specific instructions via ESNAAD.md file
 - Project status: Feature complete with rules support
 
+### Session 5 (2024-12-30)
+- Implemented Phase 10: UX Improvements & Bug Fixes
+  - Added `verify_ssl` setting to skip TLS verification for Open WebUI connections
+  - Added thinking spinner ("Esnaad Code is thinking...") during LLM requests
+  - Changed input prompt from "You:" to ">"
+  - Changed color theme from blue to Claude Code orange (#E57B3A)
+  - Added `--no-stream` CLI option for debugging
+- Fixed streaming/tool call parsing issues:
+  - Added dual format support (OpenAI + Anthropic) in LLM client
+  - Added `_parse_anthropic_response()` and `_parse_anthropic_stream_chunk()` methods
+  - Handles content blocks with type "text" and "tool_use"
+- Fixed Pydantic v2 naming conflict:
+  - Renamed `ToolResult` classmethods: `success()` → `create_success()`, `error()` → `create_error()`, `timeout()` → `create_timeout()`
+  - Updated all usages in orchestrator.py, subagent.py, and tests
+- Implemented parallel tool execution:
+  - Tools marked `parallel_safe=True` now execute concurrently via `asyncio.gather()`
+  - Sequential tools (requiring locks) still execute one at a time
+  - Results maintain original order regardless of execution order
+- Added empty response retry logic:
+  - When model returns empty response after tool calls, automatically prompts to continue
+  - Retry limit: 3 attempts or `max_iterations - 1`, whichever is lower
+  - Handles inconsistent model behavior (e.g., Qwen via Open WebUI)
+
 ## Registered Tools (11 Total)
 
 | Category | Tool | Description |
@@ -399,9 +442,12 @@ No major known issues. All core features implemented.
 Esnaad Code is now a fully functional Claude Code-style agentic system with:
 - **11 tools**: File ops (3), Filesystem (3), Shell (1), Orchestration (2), Web (2)
 - **Parallel execution**: Sub-agent coordination with dependency support
+- **Parallel tool execution**: Parallel-safe tools run concurrently via `asyncio.gather()`
 - **Interactive clarifications**: Rich-based questionnaire UI with preference learning
 - **Streaming responses**: Real-time output during LLM generation
 - **Rules system**: Project-specific instructions via ESNAAD.md files
+- **Dual API format**: Supports both OpenAI and Anthropic response formats
+- **Claude Code theme**: Orange accent color (#E57B3A) with thinking spinner
 - **Comprehensive tests**: Unit and integration tests for all components
 
 ## Rules System
