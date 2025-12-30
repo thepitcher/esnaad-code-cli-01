@@ -266,8 +266,8 @@ async def handle_command(
 /model <name> - Change the model
 /tools        - List available tools
 """,
-                title="[bold]Help[/bold]",
-                border_style="blue",
+                title="[bold #E57B3A]Help[/bold #E57B3A]",
+                border_style="#E57B3A",
             )
         )
 
@@ -286,8 +286,8 @@ Working Dir: {settings.working_directory}
 Max Iterations: {settings.orchestrator.max_iterations}
 Timeout: {settings.orchestrator.timeout_seconds}s
 """,
-                title="[bold]Configuration[/bold]",
-                border_style="blue",
+                title="[bold #E57B3A]Configuration[/bold #E57B3A]",
+                border_style="#E57B3A",
             )
         )
 
@@ -311,8 +311,8 @@ Timeout: {settings.orchestrator.timeout_seconds}s
         console.print(
             Panel(
                 f"[bold]Available Tools ({len(tools)}):[/bold]\n\n{tool_list}",
-                title="[bold]Tools[/bold]",
-                border_style="blue",
+                title="[bold #E57B3A]Tools[/bold #E57B3A]",
+                border_style="#E57B3A",
             )
         )
 

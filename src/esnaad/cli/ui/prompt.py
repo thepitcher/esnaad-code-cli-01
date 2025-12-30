@@ -11,10 +11,10 @@ from rich.console import Console
 from esnaad.config.settings import get_settings
 
 
-# Prompt style
+# Prompt style (Claude Code orange)
 PROMPT_STYLE = Style.from_dict(
     {
-        "prompt": "bold blue",
+        "prompt": "bold #E57B3A",
         "continuation": "dim",
     }
 )

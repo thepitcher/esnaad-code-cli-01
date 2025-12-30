@@ -21,8 +21,8 @@ def print_welcome(console: Console, settings: Settings) -> None:
             f"Model: [cyan]{settings.llm.model}[/cyan]\n"
             f"Working Directory: [cyan]{settings.working_directory}[/cyan]\n\n"
             "[dim]Type /help for commands, /exit to quit[/dim]",
-            border_style="blue",
-            title="[bold blue]Welcome[/bold blue]",
+            border_style="#E57B3A",
+            title="[bold #E57B3A]Welcome[/bold #E57B3A]",
         )
     )
     console.print()
