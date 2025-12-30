@@ -420,6 +420,10 @@ No major known issues. All core features implemented.
   - When model returns empty response after tool calls, automatically prompts to continue
   - Retry limit: 3 attempts or `max_iterations - 1`, whichever is lower
   - Handles inconsistent model behavior (e.g., Qwen via Open WebUI)
+- Enhanced `spawn_subtasks` guidance in system prompt:
+  - Added JSON example showing subtask structure with dependencies
+  - Added explicit triggers for when to use parallel execution
+  - LLM now reliably uses spawn_subtasks for multi-directory/file analysis
 
 ## Registered Tools (11 Total)
 
