@@ -18,8 +18,8 @@ def print_welcome(console: Console, settings: Settings) -> None:
         Panel(
             f"[bold]Esnaad Code[/bold] v{__version__}\n"
             f"[dim]AI-powered agentic coding assistant[/dim]\n\n"
-            f"Model: [cyan]{settings.llm.model}[/cyan]\n"
-            f"Working Directory: [cyan]{settings.working_directory}[/cyan]\n\n"
+            f"Model: [#E57B3A]{settings.llm.model}[/#E57B3A]\n"
+            f"Working Directory: [#E57B3A]{settings.working_directory}[/#E57B3A]\n\n"
             "[dim]Type /help for commands, /exit to quit[/dim]",
             border_style="#E57B3A",
             title="[bold #E57B3A]Welcome[/bold #E57B3A]",

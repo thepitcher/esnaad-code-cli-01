@@ -179,7 +179,7 @@ class SubAgent:
 
         # Check if tool is allowed
         if tool_call.name not in self.allowed_tools:
-            return ToolResult.error(
+            return ToolResult.create_error(
                 tool_call_id=tool_call.id,
                 tool_name=tool_call.name,
                 error=f"Tool '{tool_call.name}' not allowed for this sub-agent",
@@ -188,7 +188,7 @@ class SubAgent:
         # Get the tool
         tool = ToolRegistry.get(tool_call.name)
         if tool is None:
-            return ToolResult.error(
+            return ToolResult.create_error(
                 tool_call_id=tool_call.id,
                 tool_name=tool_call.name,
                 error=f"Unknown tool: {tool_call.name}",
@@ -229,7 +229,7 @@ class SubAgent:
             else:
                 output_value = output
 
-            return ToolResult.success(
+            return ToolResult.create_success(
                 tool_call_id=tool_call.id,
                 tool_name=tool_call.name,
                 output=output_value,
@@ -237,7 +237,7 @@ class SubAgent:
             )
 
         except Exception as e:
-            return ToolResult.error(
+            return ToolResult.create_error(
                 tool_call_id=tool_call.id,
                 tool_name=tool_call.name,
                 error=str(e),

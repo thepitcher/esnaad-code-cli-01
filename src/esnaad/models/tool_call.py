@@ -99,7 +99,7 @@ class ToolResult(BaseModel):
             return f"Error: {self.error or 'Unknown error'}"
 
     @classmethod
-    def success(
+    def create_success(
         cls,
         tool_call_id: str,
         tool_name: str,
@@ -116,7 +116,7 @@ class ToolResult(BaseModel):
         )
 
     @classmethod
-    def error(
+    def create_error(
         cls,
         tool_call_id: str,
         tool_name: str,
@@ -133,7 +133,7 @@ class ToolResult(BaseModel):
         )
 
     @classmethod
-    def timeout(
+    def create_timeout(
         cls,
         tool_call_id: str,
         tool_name: str,

@@ -249,6 +249,7 @@ class LLMClient:
                 response_text=response.text,
             ) from e
 
+        logger.debug("LLM response received", response_data=data)
         return self._parse_response(data)
 
     async def _stream_completion(
@@ -331,7 +332,16 @@ class LLMClient:
             ) from e
 
     def _parse_response(self, data: dict[str, Any]) -> ChatResponse:
-        """Parse a complete API response."""
+        """Parse a complete API response (supports OpenAI and Anthropic formats)."""
+        # Check if response is wrapped in "body" (some proxies do this)
+        if "body" in data and isinstance(data["body"], dict):
+            data = data["body"]
+
+        # Detect format: Anthropic style has "content" as array and "stop_reason"
+        if "stop_reason" in data or (isinstance(data.get("content"), list)):
+            return self._parse_anthropic_response(data)
+
+        # OpenAI format
         choices = data.get("choices", [])
         if not choices:
             raise LLMResponseError("No choices in LLM response")
@@ -352,8 +362,58 @@ class LLMClient:
             usage=data.get("usage"),
         )
 
+    def _parse_anthropic_response(self, data: dict[str, Any]) -> ChatResponse:
+        """Parse Anthropic-style API response."""
+        content_blocks = data.get("content", [])
+
+        # Extract text content
+        text_content = ""
+        tool_calls = []
+
+        for block in content_blocks:
+            if isinstance(block, dict):
+                block_type = block.get("type", "")
+                if block_type == "text":
+                    text_content += block.get("text", "")
+                elif block_type == "tool_use":
+                    # Anthropic tool call format
+                    tool_calls.append(ToolCall(
+                        id=block.get("id", ""),
+                        name=block.get("name", ""),
+                        arguments=block.get("input", {}),
+                    ))
+            elif isinstance(block, str):
+                text_content += block
+
+        # Map Anthropic stop_reason to OpenAI finish_reason
+        stop_reason = data.get("stop_reason", "")
+        finish_reason_map = {
+            "end_turn": "stop",
+            "tool_use": "tool_calls",
+            "tool_calls": "tool_calls",
+            "max_tokens": "length",
+            "stop_sequence": "stop",
+        }
+        finish_reason = finish_reason_map.get(stop_reason, stop_reason)
+
+        return ChatResponse(
+            content=text_content if text_content else None,
+            tool_calls=tool_calls,
+            finish_reason=finish_reason,
+            usage=data.get("usage"),
+        )
+
     def _parse_stream_chunk(self, data: dict[str, Any]) -> ChatChunk | None:
-        """Parse a streaming chunk."""
+        """Parse a streaming chunk (supports OpenAI and Anthropic formats)."""
+        # Check if wrapped in "body"
+        if "body" in data and isinstance(data["body"], dict):
+            data = data["body"]
+
+        # Anthropic streaming format
+        if data.get("type") in ("content_block_delta", "content_block_start", "message_delta", "message_start"):
+            return self._parse_anthropic_stream_chunk(data)
+
+        # OpenAI format
         choices = data.get("choices", [])
         if not choices:
             return None
@@ -366,6 +426,58 @@ class LLMClient:
             delta_tool_calls=delta.get("tool_calls"),
             finish_reason=choice.get("finish_reason"),
         )
+
+    def _parse_anthropic_stream_chunk(self, data: dict[str, Any]) -> ChatChunk | None:
+        """Parse Anthropic-style streaming chunk."""
+        event_type = data.get("type", "")
+
+        if event_type == "content_block_delta":
+            delta = data.get("delta", {})
+            delta_type = delta.get("type", "")
+
+            if delta_type == "text_delta":
+                return ChatChunk(delta_content=delta.get("text"))
+            elif delta_type == "input_json_delta":
+                # Tool call argument delta - accumulate JSON
+                return ChatChunk(
+                    delta_tool_calls=[{
+                        "index": data.get("index", 0),
+                        "function": {"arguments": delta.get("partial_json", "")},
+                    }]
+                )
+
+        elif event_type == "content_block_start":
+            block = data.get("content_block", {})
+            if block.get("type") == "tool_use":
+                # Start of a tool call
+                return ChatChunk(
+                    delta_tool_calls=[{
+                        "index": data.get("index", 0),
+                        "id": block.get("id", ""),
+                        "type": "function",
+                        "function": {
+                            "name": block.get("name", ""),
+                            "arguments": "",
+                        },
+                    }]
+                )
+
+        elif event_type == "message_delta":
+            delta = data.get("delta", {})
+            stop_reason = delta.get("stop_reason", "")
+            finish_reason_map = {
+                "end_turn": "stop",
+                "tool_use": "tool_calls",
+                "max_tokens": "length",
+            }
+            return ChatChunk(
+                finish_reason=finish_reason_map.get(stop_reason, stop_reason)
+            )
+
+        elif event_type == "message_stop":
+            return ChatChunk(is_done=True)
+
+        return None
 
     async def close(self) -> None:
         """Close the client."""

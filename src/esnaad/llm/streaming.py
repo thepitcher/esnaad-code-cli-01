@@ -91,6 +91,13 @@ class StreamingHandler:
 
         self._state.is_complete = True
 
+        logger.debug(
+            "Stream processing complete",
+            content_length=len(self._state.content) if self._state.content else 0,
+            tool_calls_count=len(self._state.tool_calls),
+            finish_reason=self._state.finish_reason,
+        )
+
         response = ChatResponse(
             content=self._state.content or None,
             tool_calls=self._state.tool_calls,
@@ -118,11 +125,20 @@ class StreamingHandler:
 
         # Handle tool call deltas
         if chunk.delta_tool_calls:
+            logger.debug(
+                "Received tool call chunk",
+                tool_calls=chunk.delta_tool_calls,
+            )
             for tc_chunk in chunk.delta_tool_calls:
                 self._tool_accumulator.add_chunk(tc_chunk)
 
         # Handle finish reason
         if chunk.finish_reason:
+            logger.debug(
+                "Stream finish reason",
+                finish_reason=chunk.finish_reason,
+                has_tool_calls=self._tool_accumulator.has_tool_calls,
+            )
             self._state.finish_reason = chunk.finish_reason
 
     def _reset(self) -> None:

@@ -209,6 +209,14 @@ class ReActLoop:
 
         # Check if we're done (no tool calls)
         if not response.has_tool_calls:
+            # Warn if model said tool_calls but didn't provide any
+            if response.finish_reason == "tool_calls":
+                logger.warning(
+                    "Model indicated tool_calls but none were received. "
+                    "This may indicate a model or API issue.",
+                    finish_reason=response.finish_reason,
+                    content_length=len(response.content) if response.content else 0,
+                )
             logger.info(
                 "ReAct loop complete",
                 iterations=state.iteration,

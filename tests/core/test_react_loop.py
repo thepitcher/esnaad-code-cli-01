@@ -138,7 +138,7 @@ class TestReActLoop:
         ]
 
         # Mock tool execution
-        mock_tool_executor.return_value = ToolResult.success(
+        mock_tool_executor.return_value = ToolResult.create_success(
             tool_call_id="call_123",
             tool_name="test_tool",
             output={"result": "success"},
@@ -182,7 +182,7 @@ class TestReActLoop:
             ]
         }
 
-        mock_tool_executor.return_value = ToolResult.success(
+        mock_tool_executor.return_value = ToolResult.create_success(
             tool_call_id="call_123",
             tool_name="test_tool",
             output="result",
@@ -251,7 +251,7 @@ class TestReActLoop:
             },
         ]
 
-        mock_tool_executor.return_value = ToolResult.success(
+        mock_tool_executor.return_value = ToolResult.create_success(
             tool_call_id="call_123",
             tool_name="test_tool",
             output="result",

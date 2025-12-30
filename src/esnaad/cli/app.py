@@ -73,6 +73,11 @@ def chat(
         "-d",
         help="Working directory (defaults to current)",
     ),
+    no_stream: bool = typer.Option(
+        False,
+        "--no-stream",
+        help="Disable streaming (useful for debugging)",
+    ),
 ) -> None:
     """
     Start an interactive chat session or send a single message.
@@ -102,6 +107,7 @@ def chat(
             settings=settings,
             initial_message=message,
             plan_mode=plan_mode,
+            stream=not no_stream,
         )
     )
 

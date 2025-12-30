@@ -207,7 +207,7 @@ class Orchestrator:
         # Get the tool
         tool = ToolRegistry.get(tool_call.name)
         if tool is None:
-            return ToolResult.error(
+            return ToolResult.create_error(
                 tool_call_id=tool_call.id,
                 tool_name=tool_call.name,
                 error=f"Unknown tool: {tool_call.name}",
@@ -235,7 +235,7 @@ class Orchestrator:
             )
             if hit:
                 logger.debug("Cache hit", tool=tool_call.name)
-                return ToolResult.success(
+                return ToolResult.create_success(
                     tool_call_id=tool_call.id,
                     tool_name=tool_call.name,
                     output=cached_value,
@@ -283,7 +283,7 @@ class Orchestrator:
             else:
                 output_value = output
 
-            return ToolResult.success(
+            return ToolResult.create_success(
                 tool_call_id=tool_call.id,
                 tool_name=tool_call.name,
                 output=output_value,
@@ -296,7 +296,7 @@ class Orchestrator:
                 tool=tool_call.name,
                 error=str(e),
             )
-            return ToolResult.error(
+            return ToolResult.create_error(
                 tool_call_id=tool_call.id,
                 tool_name=tool_call.name,
                 error=str(e),
