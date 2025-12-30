@@ -60,6 +60,8 @@ class ReActLoop:
         on_tool_call: Callable[[ToolCall], Awaitable[None] | None] | None = None,
         on_tool_result: Callable[[ToolResult], Awaitable[None] | None] | None = None,
         on_content_delta: Callable[[str], Awaitable[None] | None] | None = None,
+        on_thinking_start: Callable[[], Awaitable[None] | None] | None = None,
+        on_thinking_end: Callable[[], Awaitable[None] | None] | None = None,
     ) -> None:
         """
         Initialize the ReAct loop.
@@ -73,6 +75,8 @@ class ReActLoop:
             on_tool_call: Callback when a tool is called
             on_tool_result: Callback when a tool returns
             on_content_delta: Callback for streaming content deltas
+            on_thinking_start: Callback when LLM request starts
+            on_thinking_end: Callback when LLM request ends
         """
         self.llm = llm_client
         self.config = config
@@ -82,6 +86,8 @@ class ReActLoop:
         self.on_tool_call = on_tool_call
         self.on_tool_result = on_tool_result
         self.on_content_delta = on_content_delta
+        self.on_thinking_start = on_thinking_start
+        self.on_thinking_end = on_thinking_end
 
     async def run(
         self,
@@ -175,10 +181,23 @@ class ReActLoop:
             message_count=len(state.messages),
         )
 
-        if self.config.stream:
-            response = await self._step_streaming(state)
-        else:
-            response = await self._step_non_streaming(state)
+        # Signal thinking start
+        if self.on_thinking_start:
+            result = self.on_thinking_start()
+            if hasattr(result, "__await__"):
+                await result
+
+        try:
+            if self.config.stream:
+                response = await self._step_streaming(state)
+            else:
+                response = await self._step_non_streaming(state)
+        finally:
+            # Signal thinking end
+            if self.on_thinking_end:
+                result = self.on_thinking_end()
+                if hasattr(result, "__await__"):
+                    await result
 
         state.last_response = response
 

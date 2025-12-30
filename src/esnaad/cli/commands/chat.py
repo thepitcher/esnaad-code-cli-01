@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.status import Status
 
 from esnaad.config.settings import Settings
 from esnaad.cli.ui.console import get_console
@@ -79,6 +80,8 @@ async def run_chat(
             on_tool_result=lambda tr: _on_tool_result(console, tr),
             clarification_handler=clarification_handler,
             on_content_delta=lambda delta: _on_content_delta(console, delta) if stream else None,
+            on_thinking_start=lambda: _on_thinking_start(console),
+            on_thinking_end=lambda: _on_thinking_end(console),
         )
 
         # Handle initial message if provided
@@ -164,6 +167,9 @@ async def process_with_orchestrator(
 # Track if we're currently streaming (to avoid duplicate output)
 _streaming_in_progress = False
 
+# Track the thinking spinner
+_thinking_spinner: Status | None = None
+
 
 def _on_content(console: Console, content: str) -> None:
     """Callback for complete content (non-streaming)."""
@@ -173,7 +179,11 @@ def _on_content(console: Console, content: str) -> None:
 
 def _on_content_delta(console: Console, delta: str) -> None:
     """Callback for streaming content deltas."""
-    global _streaming_in_progress
+    global _streaming_in_progress, _thinking_spinner
+    # Stop spinner if still running (first content received)
+    if _thinking_spinner is not None:
+        _thinking_spinner.stop()
+        _thinking_spinner = None
     if not _streaming_in_progress:
         _streaming_in_progress = True
         console.print()  # Start new line before streaming
@@ -187,8 +197,31 @@ def _reset_streaming_state() -> None:
         _streaming_in_progress = False
 
 
+def _on_thinking_start(console: Console) -> None:
+    """Callback when LLM request starts - show spinner."""
+    global _thinking_spinner
+    _thinking_spinner = console.status(
+        "[thinking]Esnaad Code is thinking...[/thinking]",
+        spinner="dots",
+    )
+    _thinking_spinner.start()
+
+
+def _on_thinking_end(console: Console) -> None:
+    """Callback when LLM request ends - hide spinner."""
+    global _thinking_spinner
+    if _thinking_spinner is not None:
+        _thinking_spinner.stop()
+        _thinking_spinner = None
+
+
 def _on_tool_call(console: Console, tool_call: ToolCall) -> None:
     """Callback when a tool is called."""
+    global _thinking_spinner
+    # Stop spinner if still running
+    if _thinking_spinner is not None:
+        _thinking_spinner.stop()
+        _thinking_spinner = None
     _reset_streaming_state()  # End any streaming before tool output
     print_tool_call(console, tool_call.name, tool_call.arguments)
 

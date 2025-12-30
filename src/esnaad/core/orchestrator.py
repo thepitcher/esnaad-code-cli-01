@@ -53,6 +53,8 @@ class Orchestrator:
         on_tool_result: Callable[[ToolResult], Awaitable[None] | None] | None = None,
         clarification_handler: Callable[[Any], Awaitable[Any]] | None = None,
         on_content_delta: Callable[[str], Awaitable[None] | None] | None = None,
+        on_thinking_start: Callable[[], Awaitable[None] | None] | None = None,
+        on_thinking_end: Callable[[], Awaitable[None] | None] | None = None,
     ) -> None:
         """
         Initialize the orchestrator.
@@ -66,6 +68,8 @@ class Orchestrator:
             on_tool_result: Callback when a tool returns
             clarification_handler: Callback for user clarifications
             on_content_delta: Callback for streaming content deltas
+            on_thinking_start: Callback when LLM request starts
+            on_thinking_end: Callback when LLM request ends
         """
         self.llm = llm_client
         self.settings = settings
@@ -83,6 +87,8 @@ class Orchestrator:
         self.on_tool_result = on_tool_result
         self._clarification_handler = clarification_handler
         self.on_content_delta = on_content_delta
+        self.on_thinking_start = on_thinking_start
+        self.on_thinking_end = on_thinking_end
 
         # Initialize state manager
         self.state_manager = StateManager(settings.working_directory)
@@ -165,6 +171,8 @@ class Orchestrator:
             on_tool_call=self.on_tool_call,
             on_tool_result=self.on_tool_result,
             on_content_delta=self.on_content_delta,
+            on_thinking_start=self.on_thinking_start,
+            on_thinking_end=self.on_thinking_end,
         )
 
         # Run the loop
