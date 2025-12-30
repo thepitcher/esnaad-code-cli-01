@@ -56,6 +56,10 @@ class LLMSettings(BaseModel):
         gt=0,
         description="Request timeout in seconds",
     )
+    verify_ssl: bool = Field(
+        default=True,
+        description="Verify SSL/TLS certificates",
+    )
 
 
 class OrchestratorSettings(BaseModel):

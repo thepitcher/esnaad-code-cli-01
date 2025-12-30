@@ -62,6 +62,7 @@ class LLMClient:
         api_key: str | None = None,
         timeout: float = 60.0,
         max_retries: int = 3,
+        verify_ssl: bool = True,
     ) -> None:
         """
         Initialize the LLM client.
@@ -71,11 +72,13 @@ class LLMClient:
             api_key: API key for authentication
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries
+            verify_ssl: Whether to verify SSL/TLS certificates
         """
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = httpx.Timeout(timeout, connect=10.0)
         self.max_retries = max_retries
+        self.verify_ssl = verify_ssl
         self._client: httpx.AsyncClient | None = None
 
     @classmethod
@@ -86,6 +89,7 @@ class LLMClient:
             base_url=settings.base_url,
             api_key=api_key,
             timeout=settings.timeout,
+            verify_ssl=settings.verify_ssl,
         )
 
     def _build_headers(self) -> dict[str, str]:
@@ -103,6 +107,7 @@ class LLMClient:
         self._client = httpx.AsyncClient(
             timeout=self.timeout,
             headers=self._build_headers(),
+            verify=self.verify_ssl,
         )
         return self
 
@@ -123,6 +128,7 @@ class LLMClient:
             self._client = httpx.AsyncClient(
                 timeout=self.timeout,
                 headers=self._build_headers(),
+                verify=self.verify_ssl,
             )
         return self._client
 
