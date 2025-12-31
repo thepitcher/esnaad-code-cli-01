@@ -50,6 +50,7 @@ class WriteFileTool(BaseTool[WriteFileInput, WriteFileOutput]):
     )
     parallel_safe = False
     requires_lock = True
+    requires_approval = True  # Destructive: modifies filesystem
 
     @property
     def input_schema(self) -> type[WriteFileInput]:

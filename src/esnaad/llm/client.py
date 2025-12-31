@@ -313,6 +313,16 @@ class LLMClient:
 
                     try:
                         data = json.loads(data_str)
+                        # Log raw data when it contains tool_calls for debugging
+                        if "choices" in data:
+                            for choice in data.get("choices", []):
+                                delta = choice.get("delta", {})
+                                if "tool_calls" in delta:
+                                    logger.debug(
+                                        "Raw SSE tool_calls data",
+                                        raw_data=data_str[:500],
+                                        parsed_tool_calls=delta.get("tool_calls"),
+                                    )
                         chunk = self._parse_stream_chunk(data)
                         if chunk:
                             yield chunk
@@ -421,9 +431,18 @@ class LLMClient:
         choice = choices[0]
         delta = choice.get("delta", {})
 
+        # Log tool calls for debugging
+        tool_calls = delta.get("tool_calls")
+        if tool_calls:
+            logger.debug(
+                "Stream chunk tool_calls",
+                tool_calls=tool_calls,
+                raw_delta=delta,
+            )
+
         return ChatChunk(
             delta_content=delta.get("content"),
-            delta_tool_calls=delta.get("tool_calls"),
+            delta_tool_calls=tool_calls,
             finish_reason=choice.get("finish_reason"),
         )
 

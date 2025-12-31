@@ -425,6 +425,25 @@ No major known issues. All core features implemented.
   - Added explicit triggers for when to use parallel execution
   - LLM now reliably uses spawn_subtasks for multi-directory/file analysis
 
+### Session 6 (2024-12-31)
+- Implemented Phase 11: Plan Mode Toggle
+  - Added `requires_approval` attribute to `BaseTool` class
+  - Created `state/plan_mode.py` with `ExecutionMode` enum and `PlanModeState` class
+  - Marked destructive tools as `requires_approval=True`: write_file, edit_file, run_command
+  - Created `cli/ui/tool_approval.py` with `ToolApprovalUI` for approval prompts
+  - Added mode indicator display functions in `cli/ui/panels.py`
+  - Implemented Shift+Tab key binding via prompt-toolkit `KeyBindings`
+  - Added `plan_mode` config and `on_tool_approval` callback to ReActLoop and Orchestrator
+  - Wired everything together in `cli/commands/chat.py`
+  - Added `/mode` command to toggle between Plan Mode and Auto Edit
+- Plan Mode feature:
+  - **Shift+Tab** or **/mode** toggles between modes during input
+  - **Plan Mode**: Destructive tools pause for user approval (y/n/a)
+  - **Auto Edit**: All tools execute automatically (default)
+  - Mode indicator shows current state in prompt prefix `[PLAN] >`
+  - "Approve All" option to approve remaining tools for current message
+- Project status: Feature complete with Plan Mode
+
 ## Registered Tools (11 Total)
 
 | Category | Tool | Description |
@@ -445,6 +464,7 @@ No major known issues. All core features implemented.
 
 Esnaad Code is now a fully functional Claude Code-style agentic system with:
 - **11 tools**: File ops (3), Filesystem (3), Shell (1), Orchestration (2), Web (2)
+- **Plan Mode**: Toggle via Shift+Tab or /mode to require approval for destructive tools
 - **Parallel execution**: Sub-agent coordination with dependency support
 - **Parallel tool execution**: Parallel-safe tools run concurrently via `asyncio.gather()`
 - **Interactive clarifications**: Rich-based questionnaire UI with preference learning
@@ -453,6 +473,46 @@ Esnaad Code is now a fully functional Claude Code-style agentic system with:
 - **Dual API format**: Supports both OpenAI and Anthropic response formats
 - **Claude Code theme**: Orange accent color (#E57B3A) with thinking spinner
 - **Comprehensive tests**: Unit and integration tests for all components
+
+## Plan Mode
+
+Plan Mode allows users to review and approve destructive tool executions before they run.
+
+### Usage
+
+- **Shift+Tab** during input to toggle mode
+- **/mode** command to toggle mode
+- Mode indicator shown in prompt: `[PLAN] >` or `>`
+
+### Tool Classification
+
+| Tool | Requires Approval |
+|------|-------------------|
+| `read_file` | No |
+| `write_file` | **Yes** |
+| `edit_file` | **Yes** |
+| `list_directory` | No |
+| `search_files` | No |
+| `search_content` | No |
+| `run_command` | **Yes** |
+| `spawn_subtasks` | No |
+| `request_clarifications` | No |
+| `web_search` | No |
+| `web_fetch` | No |
+
+### Approval Options
+
+When a tool requires approval in Plan Mode:
+- **y** - Approve and execute
+- **n** - Reject (skip this tool)
+- **a** - Approve all remaining tools for this message
+
+### Key Components
+
+- `state/plan_mode.py` - `PlanModeState` class with toggle logic
+- `cli/ui/tool_approval.py` - `ToolApprovalUI` for approval prompts
+- `cli/ui/prompt.py` - Shift+Tab key binding via `KeyBindings`
+- `tools/base.py` - `requires_approval` attribute on `BaseTool`
 
 ## Rules System
 

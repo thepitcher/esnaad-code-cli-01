@@ -27,6 +27,7 @@ class ReActConfig:
     temperature: float = 0.7
     max_tokens: int = 4096
     stream: bool = False  # Enable streaming responses
+    plan_mode: bool = False  # Require approval for destructive tools
 
 
 @dataclass
@@ -63,6 +64,7 @@ class ReActLoop:
         on_content_delta: Callable[[str], Awaitable[None] | None] | None = None,
         on_thinking_start: Callable[[], Awaitable[None] | None] | None = None,
         on_thinking_end: Callable[[], Awaitable[None] | None] | None = None,
+        on_tool_approval: Callable[[ToolCall], Awaitable[bool]] | None = None,
     ) -> None:
         """
         Initialize the ReAct loop.
@@ -78,6 +80,7 @@ class ReActLoop:
             on_content_delta: Callback for streaming content deltas
             on_thinking_start: Callback when LLM request starts
             on_thinking_end: Callback when LLM request ends
+            on_tool_approval: Callback to request approval for destructive tools
         """
         self.llm = llm_client
         self.config = config
@@ -89,6 +92,7 @@ class ReActLoop:
         self.on_content_delta = on_content_delta
         self.on_thinking_start = on_thinking_start
         self.on_thinking_end = on_thinking_end
+        self.on_tool_approval = on_tool_approval
 
     async def run(
         self,
@@ -296,9 +300,9 @@ class ReActLoop:
                     if hasattr(result, "__await__"):
                         await result
 
-            # Execute all in parallel
+            # Execute all in parallel (with approval check)
             parallel_results = await asyncio.gather(
-                *[self.tool_executor(tc) for tc in parallel_calls],
+                *[self._execute_with_approval(tc) for tc in parallel_calls],
                 return_exceptions=True,
             )
 
@@ -328,8 +332,8 @@ class ReActLoop:
                 if hasattr(result, "__await__"):
                     await result
 
-            # Execute
-            tool_result = await self.tool_executor(tool_call)
+            # Execute (with approval check)
+            tool_result = await self._execute_with_approval(tool_call)
             tool_results[tool_call.id] = tool_result
 
             # Callback
@@ -348,6 +352,35 @@ class ReActLoop:
             })
 
         return None  # Continue loop
+
+    async def _execute_with_approval(
+        self,
+        tool_call: ToolCall,
+    ) -> ToolResult:
+        """
+        Execute a tool, requesting approval if needed in plan mode.
+
+        Args:
+            tool_call: The tool call to execute.
+
+        Returns:
+            The tool result.
+        """
+        tool = ToolRegistry.get(tool_call.name)
+
+        # Check if approval is needed
+        if self.config.plan_mode and tool and tool.requires_approval:
+            if self.on_tool_approval:
+                approved = await self.on_tool_approval(tool_call)
+                if not approved:
+                    return ToolResult.create_error(
+                        tool_call_id=tool_call.id,
+                        tool_name=tool_call.name,
+                        error="Tool execution rejected by user",
+                    )
+
+        # Execute the tool
+        return await self.tool_executor(tool_call)
 
     async def _step_non_streaming(self, state: ReActState) -> ChatResponse:
         """Execute non-streaming LLM call."""

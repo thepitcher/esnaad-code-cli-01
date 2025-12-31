@@ -33,6 +33,7 @@ class OrchestratorConfig:
     max_tokens: int = 4096
     enable_clarifications: bool = True
     stream: bool = False  # Enable streaming responses
+    plan_mode: bool = False  # Require approval for destructive tools
 
 
 class Orchestrator:
@@ -55,6 +56,7 @@ class Orchestrator:
         on_content_delta: Callable[[str], Awaitable[None] | None] | None = None,
         on_thinking_start: Callable[[], Awaitable[None] | None] | None = None,
         on_thinking_end: Callable[[], Awaitable[None] | None] | None = None,
+        on_tool_approval: Callable[[ToolCall], Awaitable[bool]] | None = None,
         preset_rules: str | None = None,
         skip_working_dir_rules: bool = False,
     ) -> None:
@@ -72,6 +74,7 @@ class Orchestrator:
             on_content_delta: Callback for streaming content deltas
             on_thinking_start: Callback when LLM request starts
             on_thinking_end: Callback when LLM request ends
+            on_tool_approval: Callback to request approval for destructive tools
             preset_rules: Pre-loaded rules content (skips loading from working dir)
             skip_working_dir_rules: If True, don't load ESNAAD.md from working dir
         """
@@ -93,6 +96,7 @@ class Orchestrator:
         self.on_content_delta = on_content_delta
         self.on_thinking_start = on_thinking_start
         self.on_thinking_end = on_thinking_end
+        self.on_tool_approval = on_tool_approval
 
         # Initialize state manager
         self.state_manager = StateManager(settings.working_directory)
@@ -169,6 +173,7 @@ class Orchestrator:
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
             stream=self.config.stream,
+            plan_mode=self.config.plan_mode,
         )
 
         loop = ReActLoop(
@@ -182,6 +187,7 @@ class Orchestrator:
             on_content_delta=self.on_content_delta,
             on_thinking_start=self.on_thinking_start,
             on_thinking_end=self.on_thinking_end,
+            on_tool_approval=self.on_tool_approval,
         )
 
         # Run the loop
@@ -321,3 +327,13 @@ class Orchestrator:
         """Cleanup resources."""
         await self.state_manager.cleanup()
         await self.state_manager.clear_agent_memory(self.agent_id)
+
+    def set_plan_mode(self, enabled: bool) -> None:
+        """
+        Dynamically enable or disable plan mode.
+
+        Args:
+            enabled: True to enable plan mode, False for auto edit.
+        """
+        self.config.plan_mode = enabled
+        logger.info("Plan mode changed", enabled=enabled)

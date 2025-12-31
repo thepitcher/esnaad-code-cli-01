@@ -55,6 +55,7 @@ class EditFileTool(BaseTool[EditFileInput, EditFileOutput]):
     )
     parallel_safe = False
     requires_lock = True
+    requires_approval = True  # Destructive: modifies files
 
     @property
     def input_schema(self) -> type[EditFileInput]:

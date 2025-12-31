@@ -18,12 +18,17 @@ from esnaad.cli.ui.panels import (
     print_assistant_message,
     print_tool_call,
     print_tool_result,
+    print_mode_indicator,
+    print_mode_toggle,
 )
-from esnaad.cli.ui.prompt import get_user_input
+from esnaad.cli.ui.prompt import get_user_input, get_user_input_with_mode
 from esnaad.cli.ui.clarification import create_clarification_handler
+from esnaad.cli.ui.tool_approval import ToolApprovalUI, ApprovalDecision
 from esnaad.llm.client import LLMClient
 from esnaad.core.orchestrator import Orchestrator, OrchestratorConfig
 from esnaad.models.tool_call import ToolCall, ToolResult
+from esnaad.state.plan_mode import PlanModeState, ExecutionMode
+from esnaad.tools.registry import ToolRegistry
 from esnaad.utils.logging import setup_logging
 
 
@@ -62,13 +67,51 @@ async def run_chat(
     # Print welcome message
     print_welcome(console, settings)
 
+    # Initialize plan mode state
+    plan_mode_state = PlanModeState(
+        mode=ExecutionMode.PLAN if plan_mode else ExecutionMode.AUTO_EDIT
+    )
+
+    # Create tool approval UI
+    approval_ui = ToolApprovalUI(console)
+
     # Initialize LLM client
     async with LLMClient.from_settings(settings.llm) as client:
         # Create clarification handler
         clarification_handler = await create_clarification_handler(console)
 
-        # Create orchestrator config with streaming
-        from esnaad.core.orchestrator import OrchestratorConfig
+        # Tool approval handler for plan mode
+        async def handle_tool_approval(tool_call: ToolCall) -> bool:
+            """Handle tool approval request in plan mode."""
+            tool = ToolRegistry.get(tool_call.name)
+            result = await approval_ui.request_approval(
+                tool_call=tool_call,
+                tool_description=tool.description if tool else "",
+            )
+
+            # Handle switch to Auto Edit mode
+            if result.decision == ApprovalDecision.SWITCH_TO_AUTO_EDIT:
+                # Switch to Auto Edit mode
+                plan_mode_state.mode = ExecutionMode.AUTO_EDIT
+                if plan_mode_state.on_mode_change:
+                    plan_mode_state.on_mode_change(ExecutionMode.AUTO_EDIT)
+                # Approve this tool and all future tools (since we're now in Auto Edit)
+                return True
+
+            return result.decision in (
+                ApprovalDecision.APPROVE,
+                ApprovalDecision.APPROVE_ALL,
+            )
+
+        # Mode change callback
+        def on_mode_change(new_mode: ExecutionMode) -> None:
+            """Handle mode change from Shift+Tab."""
+            print_mode_toggle(console, new_mode)
+            orchestrator.set_plan_mode(new_mode == ExecutionMode.PLAN)
+
+        plan_mode_state.on_mode_change = on_mode_change
+
+        # Create orchestrator config with streaming and plan_mode
         config = OrchestratorConfig(
             max_iterations=settings.orchestrator.max_iterations,
             timeout_seconds=settings.orchestrator.timeout_seconds,
@@ -77,6 +120,7 @@ async def run_chat(
             max_tokens=settings.llm.max_tokens,
             enable_clarifications=settings.orchestrator.enable_clarifications,
             stream=stream,
+            plan_mode=plan_mode_state.is_plan_mode,
         )
 
         # Create orchestrator with callbacks
@@ -91,11 +135,16 @@ async def run_chat(
             on_content_delta=lambda delta: _on_content_delta(console, delta) if stream else None,
             on_thinking_start=lambda: _on_thinking_start(console),
             on_thinking_end=lambda: _on_thinking_end(console),
+            on_tool_approval=handle_tool_approval,
             preset_rules=preset_rules,
         )
 
+        # Show initial mode indicator
+        print_mode_indicator(console, plan_mode_state.mode)
+
         # Handle initial message if provided
         if initial_message:
+            approval_ui.reset_session()
             await process_with_orchestrator(
                 orchestrator=orchestrator,
                 user_input=initial_message,
@@ -105,8 +154,12 @@ async def run_chat(
         # Interactive loop
         while True:
             try:
-                # Get user input
-                user_input = await get_user_input(console)
+                # Get user input with mode toggle support
+                user_input = await get_user_input_with_mode(
+                    console,
+                    plan_mode_state,
+                    on_mode_toggle=on_mode_change,
+                )
 
                 if user_input is None:
                     # User wants to exit
@@ -123,10 +176,14 @@ async def run_chat(
                         console,
                         settings,
                         orchestrator,
+                        plan_mode_state,
                     )
                     if not should_continue:
                         break
                     continue
+
+                # Reset approval session for new message
+                approval_ui.reset_session()
 
                 # Process the message
                 await process_with_orchestrator(
@@ -252,6 +309,7 @@ async def handle_command(
     console: Console,
     settings: Settings,
     orchestrator: Orchestrator,
+    plan_mode_state: PlanModeState | None = None,
 ) -> bool:
     """
     Handle a slash command.
@@ -276,6 +334,7 @@ async def handle_command(
 /model <name> - Change the model
 /tools        - List available tools
 /rules        - Show currently active rules
+/mode         - Toggle Plan Mode / Auto Edit
 """,
                 title="[bold #E57B3A]Help[/bold #E57B3A]",
                 border_style="#E57B3A",
@@ -347,6 +406,14 @@ Timeout: {settings.orchestrator.timeout_seconds}s
             )
         else:
             console.print("[dim]No rules loaded[/dim]")
+
+    elif cmd == "/mode":
+        if plan_mode_state is not None:
+            new_mode = plan_mode_state.toggle()
+            # Note: toggle() already calls the on_mode_change callback
+            # which prints the toggle message and updates orchestrator
+        else:
+            console.print("[dim]Mode toggle not available[/dim]")
 
     else:
         console.print(f"[red]Unknown command: {cmd}[/red]")

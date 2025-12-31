@@ -10,6 +10,7 @@ from rich.status import Status
 
 from esnaad import __version__
 from esnaad.config.settings import Settings
+from esnaad.state.plan_mode import ExecutionMode
 
 
 # ASCII art banner for Esnaad Code
@@ -36,7 +37,8 @@ def print_welcome(console: Console, settings: Settings) -> None:
             f"[bold]v{__version__}[/bold] - [dim]ASKMAI-powered agentic coding assistant[/dim]\n\n"
             f"Model: [#E57B3A]{settings.llm.model}[/#E57B3A]\n"
             f"Working Directory: [#E57B3A]{settings.working_directory}[/#E57B3A]\n\n"
-            "[dim]Type /help for commands, /exit to quit[/dim]",
+            "[dim]Type /help for commands, /exit to quit[/dim]\n"
+            "[dim]Press [bold]Shift+Tab[/bold] or type [bold]/mode[/bold] to toggle Plan Mode[/dim]",
             border_style="#E57B3A",
         )
     )
@@ -146,3 +148,47 @@ def print_subtask_complete(
         console.print(f"[success]├─ ✓[/success] Subtask {subtask_id} complete")
     else:
         console.print(f"[error]├─ ✗[/error] Subtask {subtask_id} failed")
+
+
+def print_mode_indicator(console: Console, mode: ExecutionMode) -> None:
+    """
+    Print the current mode indicator.
+
+    Args:
+        console: Rich console for output.
+        mode: Current execution mode.
+    """
+    if mode == ExecutionMode.PLAN:
+        console.print(
+            "[bold #E57B3A][[/bold #E57B3A]"
+            "[bold yellow]PLAN MODE[/bold yellow]"
+            "[bold #E57B3A]][/bold #E57B3A] "
+            "[dim]Tools will pause for approval[/dim]"
+        )
+    else:
+        console.print(
+            "[bold #E57B3A][[/bold #E57B3A]"
+            "[bold green]AUTO EDIT[/bold green]"
+            "[bold #E57B3A]][/bold #E57B3A] "
+            "[dim]Tools execute automatically[/dim]"
+        )
+
+
+def print_mode_toggle(console: Console, mode: ExecutionMode) -> None:
+    """
+    Print mode toggle notification.
+
+    Args:
+        console: Rich console for output.
+        mode: New execution mode after toggle.
+    """
+    if mode == ExecutionMode.PLAN:
+        console.print(
+            "\n[bold yellow]Switched to Plan Mode[/bold yellow] - "
+            "[dim]Destructive tools will require approval[/dim]"
+        )
+    else:
+        console.print(
+            "\n[bold green]Switched to Auto Edit[/bold green] - "
+            "[dim]All tools will execute automatically[/dim]"
+        )

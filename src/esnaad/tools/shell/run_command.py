@@ -61,6 +61,7 @@ class RunCommandTool(BaseTool[RunCommandInput, RunCommandOutput]):
     )
     parallel_safe = False  # Depends on the command
     requires_lock = False
+    requires_approval = True  # Destructive: can modify system
 
     @property
     def input_schema(self) -> type[RunCommandInput]:

@@ -124,6 +124,12 @@ class StreamingToolCallAccumulator:
         """Add a tool call chunk."""
         self._chunks.append(chunk)
 
+        logger.debug(
+            "Tool call chunk received",
+            chunk=chunk,
+            chunk_keys=list(chunk.keys()) if isinstance(chunk, dict) else None,
+        )
+
         index = chunk.get("index", 0)
 
         if index not in self._by_index:
@@ -135,19 +141,56 @@ class StreamingToolCallAccumulator:
 
         current = self._by_index[index]
 
+        # Handle tool call ID
         if "id" in chunk:
             current["id"] = chunk["id"]
 
+        # Handle function data (standard OpenAI format)
         if "function" in chunk:
             func = chunk["function"]
-            if "name" in func:
+            if "name" in func and func["name"]:
+                logger.debug("Setting tool name", index=index, name=func["name"])
                 current["function"]["name"] = func["name"]
             if "arguments" in func:
                 current["function"]["arguments"] += func["arguments"]
 
+        # Handle direct name field (some APIs send this way)
+        if "name" in chunk and chunk["name"]:
+            logger.debug("Setting tool name from direct field", index=index, name=chunk["name"])
+            current["function"]["name"] = chunk["name"]
+
+        # Handle direct arguments field
+        if "arguments" in chunk:
+            current["function"]["arguments"] += chunk["arguments"]
+
+        # Handle type field
+        if "type" in chunk:
+            current["type"] = chunk["type"]
+
     def get_tool_calls(self) -> list[ToolCall]:
         """Get accumulated tool calls."""
         raw_calls = list(self._by_index.values())
+
+        # Log accumulated state for debugging
+        for idx, call in enumerate(raw_calls):
+            name = call.get("function", {}).get("name", "")
+            args_len = len(call.get("function", {}).get("arguments", ""))
+            logger.debug(
+                "Accumulated tool call",
+                index=idx,
+                id=call.get("id", ""),
+                name=name,
+                args_length=args_len,
+                has_name=bool(name),
+            )
+            if not name:
+                logger.warning(
+                    "Tool call has empty name - check API response format",
+                    index=idx,
+                    accumulated_chunks=len(self._chunks),
+                    raw_call=call,
+                )
+
         return parse_tool_calls(raw_calls)
 
     def clear(self) -> None:

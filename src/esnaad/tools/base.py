@@ -95,6 +95,9 @@ class BaseTool(ABC, Generic[TInput, TOutput]):
     requires_lock: bool = False
     """Whether the tool requires file locking."""
 
+    requires_approval: bool = False
+    """Whether the tool requires user approval in Plan Mode."""
+
     @property
     @abstractmethod
     def input_schema(self) -> type[TInput]:
