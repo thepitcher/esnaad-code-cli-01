@@ -12,17 +12,32 @@ from esnaad import __version__
 from esnaad.config.settings import Settings
 
 
+# ASCII art banner for Esnaad Code
+BANNER = r"""
+[#E57B3A]
+ ███████╗███████╗███╗   ██╗ █████╗  █████╗ ██████╗      ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██╔════╝████╗  ██║██╔══██╗██╔══██╗██╔══██╗    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ █████╗  ███████╗██╔██╗ ██║███████║███████║██║  ██║    ██║     ██║   ██║██║  ██║█████╗
+ ██╔══╝  ╚════██║██║╚██╗██║██╔══██║██╔══██║██║  ██║    ██║     ██║   ██║██║  ██║██╔══╝
+ ███████╗███████║██║ ╚████║██║  ██║██║  ██║██████╔╝    ╚██████╗╚██████╔╝██████╔╝███████╗
+ ╚══════╝╚══════╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝      ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
+[/#E57B3A]
+"""
+
+
 def print_welcome(console: Console, settings: Settings) -> None:
-    """Print the welcome message."""
+    """Print the welcome message with banner."""
+    # Print ASCII banner
+    console.print(BANNER)
+
+    # Print info panel
     console.print(
         Panel(
-            f"[bold]Esnaad Code[/bold] v{__version__}\n"
-            f"[dim]AI-powered agentic coding assistant[/dim]\n\n"
+            f"[bold]v{__version__}[/bold] - [dim]ASKMAI-powered agentic coding assistant[/dim]\n\n"
             f"Model: [#E57B3A]{settings.llm.model}[/#E57B3A]\n"
             f"Working Directory: [#E57B3A]{settings.working_directory}[/#E57B3A]\n\n"
             "[dim]Type /help for commands, /exit to quit[/dim]",
             border_style="#E57B3A",
-            title="[bold #E57B3A]Welcome[/bold #E57B3A]",
         )
     )
     console.print()
