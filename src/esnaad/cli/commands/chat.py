@@ -32,6 +32,7 @@ async def run_chat(
     initial_message: str | None = None,
     plan_mode: bool = False,
     stream: bool = True,
+    preset_rules: str | None = None,
 ) -> None:
     """
     Run the chat interface.
@@ -41,8 +42,16 @@ async def run_chat(
         initial_message: Optional initial message to send
         plan_mode: Whether to enable plan mode
         stream: Whether to enable streaming responses
+        preset_rules: Pre-loaded rules content (skips loading from working dir)
     """
+    from esnaad.config.rules import RulesLoader
+
     console = get_console()
+
+    # Load rules eagerly (either preset or from working directory)
+    if preset_rules is None:
+        # Load from working directory
+        preset_rules = await RulesLoader.load_rules(settings.working_directory)
 
     # Setup logging - only show logs in debug mode
     if settings.debug:
@@ -82,6 +91,7 @@ async def run_chat(
             on_content_delta=lambda delta: _on_content_delta(console, delta) if stream else None,
             on_thinking_start=lambda: _on_thinking_start(console),
             on_thinking_end=lambda: _on_thinking_end(console),
+            preset_rules=preset_rules,
         )
 
         # Handle initial message if provided
@@ -265,6 +275,7 @@ async def handle_command(
 /config       - Show current configuration
 /model <name> - Change the model
 /tools        - List available tools
+/rules        - Show currently active rules
 """,
                 title="[bold #E57B3A]Help[/bold #E57B3A]",
                 border_style="#E57B3A",
@@ -315,6 +326,24 @@ Timeout: {settings.orchestrator.timeout_seconds}s
                 border_style="#E57B3A",
             )
         )
+
+    elif cmd == "/rules":
+        rules_content = orchestrator._rules
+        if rules_content:
+            # Truncate if too long for display
+            if len(rules_content) > 2000:
+                display_content = rules_content[:2000] + "\n\n[dim]... (truncated)[/dim]"
+            else:
+                display_content = rules_content
+            console.print(
+                Panel(
+                    Markdown(display_content),
+                    title="[bold #E57B3A]Active Rules[/bold #E57B3A]",
+                    border_style="#E57B3A",
+                )
+            )
+        else:
+            console.print("[dim]No rules loaded[/dim]")
 
     else:
         console.print(f"[red]Unknown command: {cmd}[/red]")

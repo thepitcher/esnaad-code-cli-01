@@ -9,6 +9,9 @@ from esnaad.config.constants import RULES_FILE_NAME
 
 logger = structlog.get_logger(__name__)
 
+# Path to the rules folder (relative to this file's package)
+RULES_FOLDER = Path(__file__).parent.parent / "rules"
+
 
 class RulesLoader:
     """
@@ -149,3 +152,58 @@ class RulesLoader:
         """Check if rules are cached for a directory."""
         cache_key = str(working_directory.resolve())
         return cache_key in cls._cache
+
+    @classmethod
+    async def load_rules_from_file(cls, rules_file: Path) -> str | None:
+        """
+        Load rules from a specific file path.
+
+        Args:
+            rules_file: Path to the rules file
+
+        Returns:
+            Rules content as string, or None if file doesn't exist
+        """
+        if not rules_file.exists():
+            logger.warning(
+                "Rules file not found",
+                path=str(rules_file),
+            )
+            return None
+
+        try:
+            async with aiofiles.open(rules_file, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            content = content.strip()
+            if not content:
+                logger.debug("Rules file is empty", path=str(rules_file))
+                return None
+
+            logger.info(
+                "Rules loaded from file",
+                path=str(rules_file),
+                size=len(content),
+            )
+            return content
+
+        except Exception as e:
+            logger.warning(
+                "Failed to load rules file",
+                path=str(rules_file),
+                error=str(e),
+            )
+            return None
+
+    @classmethod
+    def get_preset_rules_path(cls, preset: str) -> Path:
+        """
+        Get the path to a preset rules file.
+
+        Args:
+            preset: Preset name (e.g., "CORE", "UI")
+
+        Returns:
+            Path to the rules file in the rules folder
+        """
+        return RULES_FOLDER / f"ESNAAD.{preset.upper()}.md"

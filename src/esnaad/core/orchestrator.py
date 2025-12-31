@@ -55,6 +55,8 @@ class Orchestrator:
         on_content_delta: Callable[[str], Awaitable[None] | None] | None = None,
         on_thinking_start: Callable[[], Awaitable[None] | None] | None = None,
         on_thinking_end: Callable[[], Awaitable[None] | None] | None = None,
+        preset_rules: str | None = None,
+        skip_working_dir_rules: bool = False,
     ) -> None:
         """
         Initialize the orchestrator.
@@ -70,6 +72,8 @@ class Orchestrator:
             on_content_delta: Callback for streaming content deltas
             on_thinking_start: Callback when LLM request starts
             on_thinking_end: Callback when LLM request ends
+            preset_rules: Pre-loaded rules content (skips loading from working dir)
+            skip_working_dir_rules: If True, don't load ESNAAD.md from working dir
         """
         self.llm = llm_client
         self.settings = settings
@@ -103,9 +107,10 @@ class Orchestrator:
         # Conversation history
         self.messages: list[dict[str, Any]] = []
 
-        # Rules (loaded lazily)
-        self._rules: str | None = None
-        self._rules_loaded: bool = False
+        # Rules (loaded lazily or from preset)
+        self._rules: str | None = preset_rules
+        self._rules_loaded: bool = preset_rules is not None
+        self._skip_working_dir_rules: bool = skip_working_dir_rules or preset_rules is not None
 
         logger.info(
             "Orchestrator initialized",
@@ -116,10 +121,14 @@ class Orchestrator:
     async def _ensure_rules_loaded(self) -> None:
         """Ensure rules are loaded (lazy loading)."""
         if not self._rules_loaded:
-            self._rules = await RulesLoader.load_rules(
-                self.settings.working_directory
-            )
-            self._rules_loaded = True
+            if self._skip_working_dir_rules:
+                # Skip loading from working directory (preset rules already set or disabled)
+                self._rules_loaded = True
+            else:
+                self._rules = await RulesLoader.load_rules(
+                    self.settings.working_directory
+                )
+                self._rules_loaded = True
 
     async def run(self, user_message: str) -> AgentResult:
         """

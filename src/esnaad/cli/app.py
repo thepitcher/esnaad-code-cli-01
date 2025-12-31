@@ -44,6 +44,49 @@ def main_callback(
     pass
 
 
+def _run_chat_with_preset(
+    message: Optional[str],
+    model: Optional[str],
+    plan_mode: bool,
+    no_clarify: bool,
+    working_dir: Optional[Path],
+    no_stream: bool,
+    preset: Optional[str] = None,
+) -> None:
+    """Common logic for chat commands with optional preset rules."""
+    from esnaad.cli.commands.chat import run_chat
+    from esnaad.config.rules import RulesLoader
+
+    settings = get_settings()
+
+    # Override settings if options provided
+    if model:
+        settings.llm.model = model
+    if working_dir:
+        settings.working_directory = working_dir.resolve()
+    if no_clarify:
+        settings.orchestrator.enable_clarifications = False
+
+    # Load preset rules if specified
+    preset_rules = None
+    if preset:
+        rules_path = RulesLoader.get_preset_rules_path(preset)
+        if rules_path.exists():
+            preset_rules = rules_path.read_text(encoding="utf-8").strip()
+        else:
+            console.print(f"[yellow]Warning: Rules file not found: {rules_path}[/yellow]")
+
+    asyncio.run(
+        run_chat(
+            settings=settings,
+            initial_message=message,
+            plan_mode=plan_mode,
+            stream=not no_stream,
+            preset_rules=preset_rules,
+        )
+    )
+
+
 @app.command()
 def chat(
     message: Optional[str] = typer.Argument(
@@ -90,25 +133,128 @@ def chat(
 
         esnaad chat  # Starts interactive mode
     """
-    from esnaad.cli.commands.chat import run_chat
+    _run_chat_with_preset(
+        message=message,
+        model=model,
+        plan_mode=plan_mode,
+        no_clarify=no_clarify,
+        working_dir=working_dir,
+        no_stream=no_stream,
+        preset=None,
+    )
 
-    settings = get_settings()
 
-    # Override settings if options provided
-    if model:
-        settings.llm.model = model
-    if working_dir:
-        settings.working_directory = working_dir.resolve()
-    if no_clarify:
-        settings.orchestrator.enable_clarifications = False
+@app.command()
+def core(
+    message: Optional[str] = typer.Argument(
+        None,
+        help="Initial message to send (starts interactive mode if not provided)",
+    ),
+    model: str = typer.Option(
+        None,
+        "--model",
+        "-m",
+        help="Model to use (overrides config)",
+    ),
+    plan_mode: bool = typer.Option(
+        False,
+        "--plan",
+        "-p",
+        help="Enable plan mode (ask before executing)",
+    ),
+    no_clarify: bool = typer.Option(
+        False,
+        "--no-clarify",
+        help="Skip clarification questions",
+    ),
+    working_dir: Optional[Path] = typer.Option(
+        None,
+        "--dir",
+        "-d",
+        help="Working directory (defaults to current)",
+    ),
+    no_stream: bool = typer.Option(
+        False,
+        "--no-stream",
+        help="Disable streaming (useful for debugging)",
+    ),
+) -> None:
+    """
+    Start chat with CORE preset rules (backend/core development).
 
-    asyncio.run(
-        run_chat(
-            settings=settings,
-            initial_message=message,
-            plan_mode=plan_mode,
-            stream=not no_stream,
-        )
+    Loads rules from rules/ESNAAD.CORE.md instead of working directory ESNAAD.md.
+
+    Examples:
+
+        esnaad core "Fix the database connection issue"
+
+        esnaad core  # Starts interactive mode with CORE rules
+    """
+    _run_chat_with_preset(
+        message=message,
+        model=model,
+        plan_mode=plan_mode,
+        no_clarify=no_clarify,
+        working_dir=working_dir,
+        no_stream=no_stream,
+        preset="CORE",
+    )
+
+
+@app.command()
+def ui(
+    message: Optional[str] = typer.Argument(
+        None,
+        help="Initial message to send (starts interactive mode if not provided)",
+    ),
+    model: str = typer.Option(
+        None,
+        "--model",
+        "-m",
+        help="Model to use (overrides config)",
+    ),
+    plan_mode: bool = typer.Option(
+        False,
+        "--plan",
+        "-p",
+        help="Enable plan mode (ask before executing)",
+    ),
+    no_clarify: bool = typer.Option(
+        False,
+        "--no-clarify",
+        help="Skip clarification questions",
+    ),
+    working_dir: Optional[Path] = typer.Option(
+        None,
+        "--dir",
+        "-d",
+        help="Working directory (defaults to current)",
+    ),
+    no_stream: bool = typer.Option(
+        False,
+        "--no-stream",
+        help="Disable streaming (useful for debugging)",
+    ),
+) -> None:
+    """
+    Start chat with UI preset rules (frontend/UI development).
+
+    Loads rules from rules/ESNAAD.UI.md instead of working directory ESNAAD.md.
+
+    Examples:
+
+        esnaad ui "Update the login form styling"
+
+        esnaad ui  # Starts interactive mode with UI rules
+    """
+    _run_chat_with_preset(
+        message=message,
+        model=model,
+        plan_mode=plan_mode,
+        no_clarify=no_clarify,
+        working_dir=working_dir,
+        no_stream=no_stream,
+        preset="UI",
     )
 
 
