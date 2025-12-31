@@ -1,5 +1,6 @@
 """Pydantic settings for Esnaad Code configuration."""
 
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,10 @@ from esnaad.config.constants import (
     COMMAND_TIMEOUT,
     SEARCH_MAX_RESULTS,
 )
+
+# Default config directory and file
+CONFIG_DIR = Path.home() / ".esnaad"
+CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
 class LLMSettings(BaseModel):
@@ -172,10 +177,68 @@ class Settings(BaseSettings):
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
 
+def _load_config_file() -> dict[str, Any]:
+    """Load configuration from JSON file if it exists."""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+    return {}
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Deep merge two dictionaries."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 @lru_cache
 def get_settings() -> Settings:
-    """Get cached settings instance."""
+    """
+    Get cached settings instance.
+
+    Settings are loaded in this priority (later overrides earlier):
+    1. Default values
+    2. ~/.esnaad/config.json
+    3. Environment variables (ESNAAD_*)
+    """
+    # Load from config file first
+    config_data = _load_config_file()
+
+    if config_data:
+        # Create settings with config file data, env vars will override
+        return Settings(**config_data)
+
     return Settings()
+
+
+def save_config(config: dict[str, Any]) -> None:
+    """
+    Save configuration to ~/.esnaad/config.json.
+
+    Args:
+        config: Configuration dictionary to save
+    """
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Load existing config and merge
+    existing = _load_config_file()
+    merged = _deep_merge(existing, config)
+
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(merged, f, indent=2, default=str)
+
+
+def get_config_path() -> Path:
+    """Get the path to the config file."""
+    return CONFIG_FILE
 
 
 def load_project_settings(project_dir: Path) -> Settings:

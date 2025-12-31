@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-from esnaad.config.settings import get_settings
+from esnaad.config.settings import get_settings, CONFIG_FILE, save_config
 from esnaad.cli.ui.console import get_console
 
 
@@ -47,6 +47,9 @@ def run_config(
 
 def _show_all_config(console: Console, settings) -> None:
     """Show all configuration values."""
+    # Show config file location
+    console.print(f"[dim]Config file:[/dim] {CONFIG_FILE}\n")
+
     table = Table(title="Configuration", show_header=True)
     table.add_column("Key", style="cyan")
     table.add_column("Value", style="green")
@@ -111,16 +114,30 @@ def _show_config_key(console: Console, settings, key: str) -> None:
 
 def _set_config_key(console: Console, key: str, value: str) -> None:
     """Set a configuration value."""
-    console.print(
-        Panel(
-            "[yellow]Setting configuration values is not yet implemented.[/yellow]\n\n"
-            "Please set configuration via environment variables or .env file.\n\n"
-            f"To set [cyan]{key}[/cyan], use:\n"
-            f"  ESNAAD_{key.upper().replace('.', '__')}={value}",
-            title="[bold]Configuration[/bold]",
-            border_style="yellow",
-        )
-    )
+    # Parse the key to build nested dict
+    parts = key.split(".")
+    config = {}
+    current = config
+
+    for i, part in enumerate(parts[:-1]):
+        current[part] = {}
+        current = current[part]
+
+    # Convert value to appropriate type
+    if value.lower() in ("true", "false"):
+        current[parts[-1]] = value.lower() == "true"
+    elif value.isdigit():
+        current[parts[-1]] = int(value)
+    else:
+        try:
+            current[parts[-1]] = float(value)
+        except ValueError:
+            current[parts[-1]] = value
+
+    # Save to config file
+    save_config(config)
+    console.print(f"[green]Saved:[/green] {key} = {value}")
+    console.print(f"[dim]Config file: {CONFIG_FILE}[/dim]")
 
 
 def _show_env_vars(console: Console) -> None:
@@ -152,4 +169,9 @@ def _show_env_vars(console: Console) -> None:
         table.add_row(var, desc)
 
     console.print(table)
-    console.print("\n[dim]Set these in your shell or in a .env file[/dim]")
+    console.print(
+        f"\n[dim]Configuration priority (later overrides earlier):[/dim]\n"
+        f"  1. Default values\n"
+        f"  2. {CONFIG_FILE}\n"
+        f"  3. Environment variables (ESNAAD_*)\n"
+    )

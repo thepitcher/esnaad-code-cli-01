@@ -287,9 +287,12 @@ async def handle_command(
         console.print("[green]Conversation cleared[/green]")
 
     elif cmd == "/config":
+        from esnaad.config.settings import CONFIG_FILE
         console.print(
             Panel(
                 f"""[bold]Current Configuration:[/bold]
+
+Config File: {CONFIG_FILE}
 
 Model: {settings.llm.model}
 Base URL: {settings.llm.base_url}
