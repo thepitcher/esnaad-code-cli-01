@@ -14,8 +14,10 @@ from esnaad.llm.client import LLMClient
 from esnaad.llm.messages import get_orchestrator_prompt
 from esnaad.models.tool_call import ToolCall, ToolResult
 from esnaad.models.result import AgentResult
+from esnaad.models.todo import TodoList
 from esnaad.core.react_loop import ReActLoop, ReActConfig
 from esnaad.state.manager import StateManager
+from esnaad.state.todo_manager import TodoManager
 from esnaad.tools.base import ToolContext
 from esnaad.tools.registry import ToolRegistry
 
@@ -57,6 +59,7 @@ class Orchestrator:
         on_thinking_start: Callable[[], Awaitable[None] | None] | None = None,
         on_thinking_end: Callable[[], Awaitable[None] | None] | None = None,
         on_tool_approval: Callable[[ToolCall], Awaitable[bool]] | None = None,
+        on_todo_change: Callable[[TodoList], None] | None = None,
         preset_rules: str | None = None,
         skip_working_dir_rules: bool = False,
     ) -> None:
@@ -75,6 +78,7 @@ class Orchestrator:
             on_thinking_start: Callback when LLM request starts
             on_thinking_end: Callback when LLM request ends
             on_tool_approval: Callback to request approval for destructive tools
+            on_todo_change: Callback when todo list is updated
             preset_rules: Pre-loaded rules content (skips loading from working dir)
             skip_working_dir_rules: If True, don't load ESNAAD.md from working dir
         """
@@ -97,9 +101,16 @@ class Orchestrator:
         self.on_thinking_start = on_thinking_start
         self.on_thinking_end = on_thinking_end
         self.on_tool_approval = on_tool_approval
+        self.on_todo_change = on_todo_change
 
         # Initialize state manager
         self.state_manager = StateManager(settings.working_directory)
+
+        # Initialize todo manager
+        self._todo_manager = TodoManager(
+            state_manager=self.state_manager,
+            on_change=self._handle_todo_change,
+        )
 
         # Initialize tool registry
         if not ToolRegistry.is_initialized():
@@ -121,6 +132,11 @@ class Orchestrator:
             agent_id=self.agent_id,
             model=self.config.model,
         )
+
+    def _handle_todo_change(self, todo_list: TodoList) -> None:
+        """Handle todo list changes."""
+        if self.on_todo_change:
+            self.on_todo_change(todo_list)
 
     async def _ensure_rules_loaded(self) -> None:
         """Ensure rules are loaded (lazy loading)."""
@@ -239,6 +255,7 @@ class Orchestrator:
                 "llm_client": self.llm,
                 "clarification_handler": self._clarification_handler,
                 "rules": self._rules,
+                "todo_manager": self._todo_manager,
             },
         )
 

@@ -1,4 +1,4 @@
-"""Tests for orchestration tools (spawn_subtasks, request_clarifications)."""
+"""Tests for orchestration tools (spawn_subtasks, request_clarifications, write_todo)."""
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
@@ -14,9 +14,16 @@ from esnaad.tools.orchestration.request_clarifications import (
     QuestionInput,
     OptionInput,
 )
+from esnaad.tools.orchestration.write_todo import (
+    WriteTodoTool,
+    WriteTodoInput,
+    TodoItemInput,
+)
 from esnaad.tools.base import ToolContext
 from esnaad.models.subtask import SubtaskResult, SubtaskStatus
 from esnaad.models.clarification import ClarificationResponse
+from esnaad.models.todo import TodoList, TodoStatus
+from esnaad.state.todo_manager import TodoManager
 from esnaad.exceptions import ToolExecutionError
 
 
@@ -248,3 +255,199 @@ class TestRequestClarificationsTool:
         assert schema["function"]["name"] == "request_clarifications"
         assert "questions" in schema["function"]["parameters"]["properties"]
         assert "context" in schema["function"]["parameters"]["properties"]
+
+
+class TestWriteTodoTool:
+    """Tests for WriteTodoTool."""
+
+    @pytest.fixture
+    def tool(self) -> WriteTodoTool:
+        return WriteTodoTool()
+
+    @pytest.fixture
+    def todo_manager(self) -> TodoManager:
+        return TodoManager()
+
+    @pytest.fixture
+    def tool_context_with_todo(
+        self,
+        tool_context: ToolContext,
+        todo_manager: TodoManager,
+    ) -> ToolContext:
+        """Create context with todo manager."""
+        tool_context.metadata["todo_manager"] = todo_manager
+        return tool_context
+
+    async def test_create_todo_list(
+        self,
+        tool: WriteTodoTool,
+        tool_context_with_todo: ToolContext,
+    ) -> None:
+        """Test creating a todo list."""
+        input_data = WriteTodoInput(
+            todos=[
+                TodoItemInput(
+                    content="Task 1",
+                    activeForm="Working on task 1",
+                    status="pending",
+                ),
+                TodoItemInput(
+                    content="Task 2",
+                    activeForm="Working on task 2",
+                    status="in_progress",
+                ),
+                TodoItemInput(
+                    content="Task 3",
+                    activeForm="Working on task 3",
+                    status="completed",
+                ),
+            ],
+        )
+
+        result = await tool.execute(input_data, tool_context_with_todo)
+
+        assert result.success
+        assert result.total == 3
+        assert result.pending == 1
+        assert result.in_progress == 1
+        assert result.completed == 1
+        assert result.current_task == "Working on task 2"
+
+    async def test_update_todo_status(
+        self,
+        tool: WriteTodoTool,
+        tool_context_with_todo: ToolContext,
+    ) -> None:
+        """Test updating todo status."""
+        # First create a pending task
+        await tool.execute(
+            WriteTodoInput(
+                todos=[
+                    TodoItemInput(
+                        content="Task 1",
+                        activeForm="Working on task 1",
+                        status="pending",
+                    ),
+                ],
+            ),
+            tool_context_with_todo,
+        )
+
+        # Then mark it completed
+        result = await tool.execute(
+            WriteTodoInput(
+                todos=[
+                    TodoItemInput(
+                        content="Task 1",
+                        activeForm="Working on task 1",
+                        status="completed",
+                    ),
+                ],
+            ),
+            tool_context_with_todo,
+        )
+
+        assert result.completed == 1
+        assert result.pending == 0
+        assert result.current_task is None
+
+    async def test_empty_todo_list(
+        self,
+        tool: WriteTodoTool,
+        tool_context_with_todo: ToolContext,
+    ) -> None:
+        """Test creating empty todo list."""
+        input_data = WriteTodoInput(todos=[])
+
+        result = await tool.execute(input_data, tool_context_with_todo)
+
+        assert result.success
+        assert result.total == 0
+        assert result.current_task is None
+
+    async def test_without_todo_manager(
+        self,
+        tool: WriteTodoTool,
+        tool_context: ToolContext,
+    ) -> None:
+        """Test that tool works without pre-injected todo manager."""
+        input_data = WriteTodoInput(
+            todos=[
+                TodoItemInput(
+                    content="Task 1",
+                    activeForm="Working on task 1",
+                    status="pending",
+                ),
+            ],
+        )
+
+        # Should create its own TodoManager
+        result = await tool.execute(input_data, tool_context)
+
+        assert result.success
+        assert result.total == 1
+
+    def test_input_validation(self) -> None:
+        """Test input validation."""
+        # Valid input
+        input_data = WriteTodoInput(
+            todos=[
+                TodoItemInput(
+                    content="Task",
+                    activeForm="Tasking",
+                    status="pending",
+                ),
+            ],
+        )
+        assert len(input_data.todos) == 1
+
+        # Invalid status should default to pending
+        item = TodoItemInput(
+            content="Task",
+            activeForm="Tasking",
+            status="invalid_status",
+        )
+        assert item.status == "invalid_status"  # Raw value
+
+    def test_openai_schema(self, tool: WriteTodoTool) -> None:
+        """Test OpenAI schema generation."""
+        schema = tool.to_openai_schema()
+
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "write_todo"
+        assert "todos" in schema["function"]["parameters"]["properties"]
+
+    async def test_callback_triggered(
+        self,
+        tool: WriteTodoTool,
+        tool_context: ToolContext,
+    ) -> None:
+        """Test that callback is triggered on todo change."""
+        callback_called = False
+        received_list: TodoList | None = None
+
+        def on_change(todo_list: TodoList) -> None:
+            nonlocal callback_called, received_list
+            callback_called = True
+            received_list = todo_list
+
+        todo_manager = TodoManager(on_change=on_change)
+        tool_context.metadata["todo_manager"] = todo_manager
+
+        input_data = WriteTodoInput(
+            todos=[
+                TodoItemInput(
+                    content="Task 1",
+                    activeForm="Working on task 1",
+                    status="in_progress",
+                ),
+            ],
+        )
+
+        await tool.execute(input_data, tool_context)
+
+        assert callback_called
+        assert received_list is not None
+        assert received_list.total_count == 1
+        assert received_list.current_task is not None
+        assert received_list.current_task.active_form == "Working on task 1"

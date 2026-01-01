@@ -24,9 +24,11 @@ from esnaad.cli.ui.panels import (
 from esnaad.cli.ui.prompt import get_user_input, get_user_input_with_mode
 from esnaad.cli.ui.clarification import create_clarification_handler
 from esnaad.cli.ui.tool_approval import ToolApprovalUI, ApprovalDecision
+from esnaad.cli.ui.todo_display import print_todo_list
 from esnaad.llm.client import LLMClient
 from esnaad.core.orchestrator import Orchestrator, OrchestratorConfig
 from esnaad.models.tool_call import ToolCall, ToolResult
+from esnaad.models.todo import TodoList
 from esnaad.state.plan_mode import PlanModeState, ExecutionMode
 from esnaad.tools.registry import ToolRegistry
 from esnaad.utils.logging import setup_logging
@@ -123,6 +125,12 @@ async def run_chat(
             plan_mode=plan_mode_state.is_plan_mode,
         )
 
+        # Todo change callback
+        def on_todo_change(todo_list: TodoList) -> None:
+            """Handle todo list updates."""
+            _reset_streaming_state()  # End streaming before todo display
+            print_todo_list(console, todo_list)
+
         # Create orchestrator with callbacks
         orchestrator = Orchestrator(
             llm_client=client,
@@ -136,6 +144,7 @@ async def run_chat(
             on_thinking_start=lambda: _on_thinking_start(console),
             on_thinking_end=lambda: _on_thinking_end(console),
             on_tool_approval=handle_tool_approval,
+            on_todo_change=on_todo_change,
             preset_rules=preset_rules,
         )
 
