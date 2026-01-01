@@ -36,19 +36,34 @@ class ToolCall(BaseModel):
     @classmethod
     def from_openai_format(cls, data: dict[str, Any]) -> "ToolCall":
         """Create from OpenAI API format."""
+        import ast
         import json
+        import uuid
 
         function = data.get("function", {})
         arguments_str = function.get("arguments", "{}")
 
-        # Parse arguments JSON
-        try:
-            arguments = json.loads(arguments_str)
-        except json.JSONDecodeError:
-            arguments = {}
+        # Parse arguments - try JSON first, then Python literal syntax
+        arguments = {}
+        if arguments_str:
+            try:
+                arguments = json.loads(arguments_str)
+            except json.JSONDecodeError:
+                # Some models send Python dict syntax with single quotes
+                try:
+                    arguments = ast.literal_eval(arguments_str)
+                    if not isinstance(arguments, dict):
+                        arguments = {}
+                except (ValueError, SyntaxError):
+                    arguments = {}
+
+        # Handle None or missing ID by generating a fallback
+        tool_id = data.get("id")
+        if not tool_id:
+            tool_id = f"call_{uuid.uuid4().hex[:12]}"
 
         return cls(
-            id=data.get("id", ""),
+            id=tool_id,
             name=function.get("name", ""),
             arguments=arguments,
         )

@@ -56,8 +56,15 @@ def _run_chat_with_preset(
     """Common logic for chat commands with optional preset rules."""
     from esnaad.cli.commands.chat import run_chat
     from esnaad.config.rules import RulesLoader
+    from esnaad.utils.logging import setup_logging
 
     settings = get_settings()
+
+    # Setup logging early - before any operations that might log
+    if settings.debug:
+        setup_logging(level=settings.log_level)
+    else:
+        setup_logging(level="ERROR")  # Suppress info/warning/debug logs
 
     # Override settings if options provided
     if model:
@@ -67,13 +74,12 @@ def _run_chat_with_preset(
     if no_clarify:
         settings.orchestrator.enable_clarifications = False
 
-    # Load preset rules if specified
+    # Load preset rules if specified (with include processing)
     preset_rules = None
     if preset:
         rules_path = RulesLoader.get_preset_rules_path(preset)
-        if rules_path.exists():
-            preset_rules = rules_path.read_text(encoding="utf-8").strip()
-        else:
+        preset_rules = RulesLoader.load_rules_from_file_sync(rules_path)
+        if preset_rules is None:
             console.print(f"[yellow]Warning: Rules file not found: {rules_path}[/yellow]")
 
     asyncio.run(

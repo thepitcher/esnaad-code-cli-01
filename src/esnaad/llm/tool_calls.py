@@ -97,7 +97,7 @@ def merge_streaming_tool_calls(
             func = chunk["function"]
             if "name" in func:
                 current["function"]["name"] = func["name"]
-            if "arguments" in func:
+            if "arguments" in func and func["arguments"]:
                 current["function"]["arguments"] += func["arguments"]
 
     return list(by_index.values())
@@ -141,8 +141,8 @@ class StreamingToolCallAccumulator:
 
         current = self._by_index[index]
 
-        # Handle tool call ID
-        if "id" in chunk:
+        # Handle tool call ID (don't overwrite a valid ID with None/empty)
+        if "id" in chunk and chunk["id"]:
             current["id"] = chunk["id"]
 
         # Handle function data (standard OpenAI format)
@@ -151,7 +151,7 @@ class StreamingToolCallAccumulator:
             if "name" in func and func["name"]:
                 logger.debug("Setting tool name", index=index, name=func["name"])
                 current["function"]["name"] = func["name"]
-            if "arguments" in func:
+            if "arguments" in func and func["arguments"]:
                 current["function"]["arguments"] += func["arguments"]
 
         # Handle direct name field (some APIs send this way)
@@ -160,7 +160,7 @@ class StreamingToolCallAccumulator:
             current["function"]["name"] = chunk["name"]
 
         # Handle direct arguments field
-        if "arguments" in chunk:
+        if "arguments" in chunk and chunk["arguments"]:
             current["function"]["arguments"] += chunk["arguments"]
 
         # Handle type field

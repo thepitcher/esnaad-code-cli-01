@@ -1,5 +1,6 @@
 """Rules loader for ESNAAD.md project rules."""
 
+import re
 from pathlib import Path
 
 import aiofiles
@@ -23,6 +24,72 @@ class RulesLoader:
 
     # Class-level cache: working_directory -> rules content
     _cache: dict[str, str | None] = {}
+
+    @classmethod
+    def _process_includes(
+        cls,
+        content: str,
+        base_path: Path,
+        seen: set[Path] | None = None,
+    ) -> str:
+        """
+        Process include directives in rules content.
+
+        Syntax: <!-- #include FILENAME.md -->
+
+        Args:
+            content: The content to process
+            base_path: Directory for resolving relative includes
+            seen: Set of already-included paths (circular reference prevention)
+
+        Returns:
+            Content with includes resolved
+        """
+        if seen is None:
+            seen = set()
+
+        pattern = r'<!--\s*#include\s+(.+?)\s*-->'
+
+        def replace_include(match: re.Match) -> str:
+            include_file = match.group(1).strip()
+            include_path = (base_path / include_file).resolve()
+
+            # Prevent circular includes
+            if include_path in seen:
+                logger.warning(
+                    "Circular include detected",
+                    file=include_file,
+                    path=str(include_path),
+                )
+                return f"[Circular include: {include_file}]"
+
+            if include_path.exists():
+                seen.add(include_path)
+                try:
+                    included = include_path.read_text(encoding="utf-8")
+                    logger.debug(
+                        "Include resolved",
+                        file=include_file,
+                        size=len(included),
+                    )
+                    # Recursive processing for nested includes
+                    return cls._process_includes(included, include_path.parent, seen)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to read include file",
+                        file=include_file,
+                        error=str(e),
+                    )
+                    return f"[Include error: {include_file}]"
+
+            logger.warning(
+                "Include file not found",
+                file=include_file,
+                path=str(include_path),
+            )
+            return f"[Include not found: {include_file}]"
+
+        return re.sub(pattern, replace_include, content)
 
     @classmethod
     def get_rules_path(cls, working_directory: Path) -> Path:
@@ -72,6 +139,9 @@ class RulesLoader:
                 logger.debug("Rules file is empty", path=str(rules_path))
                 cls._cache[cache_key] = None
                 return None
+
+            # Process includes relative to the rules file's directory
+            content = cls._process_includes(content, rules_path.parent)
 
             logger.info(
                 "Rules loaded",
@@ -124,6 +194,9 @@ class RulesLoader:
                 cls._cache[cache_key] = None
                 return None
 
+            # Process includes relative to the rules file's directory
+            content = cls._process_includes(content, rules_path.parent)
+
             cls._cache[cache_key] = content
             return content
 
@@ -156,13 +229,13 @@ class RulesLoader:
     @classmethod
     async def load_rules_from_file(cls, rules_file: Path) -> str | None:
         """
-        Load rules from a specific file path.
+        Load rules from a specific file path with include processing.
 
         Args:
             rules_file: Path to the rules file
 
         Returns:
-            Rules content as string, or None if file doesn't exist
+            Rules content as string with includes resolved, or None if file doesn't exist
         """
         if not rules_file.exists():
             logger.warning(
@@ -179,6 +252,51 @@ class RulesLoader:
             if not content:
                 logger.debug("Rules file is empty", path=str(rules_file))
                 return None
+
+            # Process includes relative to the rules file's directory
+            content = cls._process_includes(content, rules_file.parent)
+
+            logger.info(
+                "Rules loaded from file",
+                path=str(rules_file),
+                size=len(content),
+            )
+            return content
+
+        except Exception as e:
+            logger.warning(
+                "Failed to load rules file",
+                path=str(rules_file),
+                error=str(e),
+            )
+            return None
+
+    @classmethod
+    def load_rules_from_file_sync(cls, rules_file: Path) -> str | None:
+        """
+        Synchronous version of load_rules_from_file with include processing.
+
+        Args:
+            rules_file: Path to the rules file
+
+        Returns:
+            Rules content as string with includes resolved, or None if file doesn't exist
+        """
+        if not rules_file.exists():
+            logger.warning(
+                "Rules file not found",
+                path=str(rules_file),
+            )
+            return None
+
+        try:
+            content = rules_file.read_text(encoding="utf-8").strip()
+            if not content:
+                logger.debug("Rules file is empty", path=str(rules_file))
+                return None
+
+            # Process includes relative to the rules file's directory
+            content = cls._process_includes(content, rules_file.parent)
 
             logger.info(
                 "Rules loaded from file",
@@ -198,12 +316,13 @@ class RulesLoader:
     @classmethod
     def get_preset_rules_path(cls, preset: str) -> Path:
         """
-        Get the path to a preset rules file.
+        Get the path to a preset rules file in its subfolder.
 
         Args:
             preset: Preset name (e.g., "CORE", "UI")
 
         Returns:
-            Path to the rules file in the rules folder
+            Path to the rules file in the preset's subfolder
         """
-        return RULES_FOLDER / f"ESNAAD.{preset.upper()}.md"
+        preset_lower = preset.lower()
+        return RULES_FOLDER / preset_lower / f"ESNAAD.{preset.upper()}.md"
