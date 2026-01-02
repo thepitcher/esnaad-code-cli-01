@@ -4,6 +4,19 @@
 Esnaad is a **legacy .NET Framework 4.0.1 enterprise application** for military systems consist of Logistics, Maintenance, Operations, and many more modules. It uses a modular monolith architecture with Domain-Driven Design elements, CQRS pattern, and Spring.NET for dependency injection.
 
 ---
+## Code Formatting Rules
+
+**CRITICAL:** When generating C# code files:
+- **DO NOT add extra blank lines between code lines**
+- Use standard C# formatting with proper spacing
+- Only ONE blank line between:
+  - Groups of using statements and namespace declaration
+  - Class members (properties, methods, constructors)
+- **Bad:** `using System;\n\nusing NextGen...` (double newline = extra blank line)
+- **Good:** `using System;\nusing NextGen...` (single newline = no extra blank line)
+
+---
+
 ## Terminology
 - **Domain**: The top-level project under src/modules (Admin, Logistic, Ammo, Maintenance, Operation, Pmco, Budget, Vehicle, etc)
 - **Modules**: Business feature/package name under specific domain.

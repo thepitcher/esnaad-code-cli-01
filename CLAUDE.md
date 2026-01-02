@@ -459,7 +459,63 @@ No major known issues. All core features implemented.
   - **Second Fix**: Removed retry limit from todo check - now checks ALWAYS when todos are incomplete
   - **Behavior**: System now detects incomplete todos at any iteration and prompts model to continue
   - **Safety**: `max_iterations` limit still prevents infinite loops
-- Project status: Bug fix complete, todo tracking now reliable
+- Implemented Phase 13: Windows Platform Enforcement
+  - **Issue**: LLM defaulting to Linux/bash commands instead of Windows CMD syntax
+  - **Changes Made**:
+    - Updated `ORCHESTRATOR_SYSTEM_PROMPT` with "Platform Environment" section (lines 69-96)
+    - Added explicit Windows command examples: dir, mkdir, copy, move, del, type
+    - Added "DO NOT use Linux commands" warning with examples
+    - Updated `SUBAGENT_SYSTEM_PROMPT` with Windows platform reminder
+    - Enhanced `build_system_prompt()` to display platform in Working Directory section
+    - Updated `run_command` tool description: "Execute a Windows shell command..."
+    - Updated `RunCommandInput.command` field description to emphasize Windows syntax
+  - **Behavior**: LLM now receives multiple reminders about Windows platform throughout system prompts
+  - **Additional**: Users can add Windows-specific rules to their project's ESNAAD.md file
+- Enhanced Entity Creation Rules Documentation
+  - **Issue**: User needed comprehensive entity creation rules for LLM to follow automatically
+  - **Changes Made**:
+    - Expanded `src/esnaad/rules/core/entity-creation.md` from 40 to 294 lines
+    - Added "When to Create an Entity" trigger section with request patterns
+    - Added step-by-step workflow (Step 1: Identify Location, Step 2: Create ID Class, Step 3: Create Entity)
+    - Added complete templates for both ID class and Entity class with `[EntityName]` placeholders
+    - Added "Pattern Requirements (MANDATORY)" checklist with 9 requirements
+    - Added File Naming Conventions table with examples
+    - Expanded examples: UnitOfMeasure (Logistic) + new WeightBalance (Maintenance) example
+    - Added "Quick Reference: Creation Checklist" with 14 verification steps
+    - Added Windows command notes for directory creation
+    - **Code Formatting Fix**: Added "Code Formatting" section to prevent extra blank lines in generated code
+  - **Structure**: File already included in main esnaad.md via `<!-- #include entity-creation.md -->`
+  - **Behavior**: When user requests "Create a new Entity for [Module]", LLM will automatically follow the complete workflow
+- Fixed Code Formatting Issue (Multiple Layers)
+  - **Issue**: LLM was generating C# files with extra blank lines between each line of code
+  - **Root Cause**: LLM was using `\n\n` (double newline) instead of `\n` (single newline) when constructing file content
+  - **Changes Made - Layer 1 (System Prompt)**:
+    - Added "File Writing Rules" section to `ORCHESTRATOR_SYSTEM_PROMPT` (lines 113-132 in messages.py)
+    - Explicit BAD vs GOOD examples showing `\n\n` vs `\n`
+    - CRITICAL warning about single newlines for code files
+  - **Changes Made - Layer 2 (Tool Level)**:
+    - Updated `write_file` tool description to mention proper formatting
+    - Updated `WriteFileInput.content` field description with newline formatting rules
+    - Emphasizes: "use single newlines (\\n) between lines, NOT double newlines (\\n\\n)"
+  - **Changes Made - Layer 3 (Project Rules)**:
+    - Added "Code Formatting Rules" section to `src/esnaad/rules/core/esnaad.md` (lines 7-17)
+    - Added formatting notes to `entity-creation.md` (lines 277-283)
+  - **Defense-in-Depth**: Rules added at 5 different levels (system prompt, tool description, tool field, main rules, entity rules)
+  - **Behavior**: LLM receives formatting instructions in system prompt, tool schemas, and project rules
+- Fixed Line Ending Issue (Windows CRLF)
+  - **Issue**: Files appeared with extra blank lines in VS Code/Sublime Text but looked fine in Notepad
+  - **Root Cause**: LLM generating Unix line endings (`\n` - LF only) instead of Windows line endings (`\r\n` - CRLF)
+  - **Why It Happened**:
+    - Notepad handles both `\n` and `\r\n` gracefully
+    - VS Code/Sublime Text with certain settings show `\n` as extra spacing on Windows
+  - **Fix Applied**:
+    - Modified `write_file` tool to automatically normalize line endings on Windows
+    - Added line ending conversion in `write_file.py` (lines 91-97)
+    - Process: `\r\n` → `\n` (normalize) → `\r\n` (Windows format)
+    - Added `newline=""` parameter to prevent Python's automatic line ending translation
+  - **Behavior**: All files written on Windows now use proper CRLF line endings
+  - **Result**: Files now display correctly in all Windows text editors
+- Project status: Line ending normalization complete, code formatting fully resolved
 
 ## Registered Tools (11 Total)
 

@@ -1,5 +1,6 @@
 """Write file tool implementation."""
 
+import sys
 from pathlib import Path
 
 import aiofiles
@@ -16,7 +17,11 @@ class WriteFileInput(BaseModel):
         description="Absolute or relative path to the file to write"
     )
     content: str = Field(
-        description="Content to write to the file"
+        description=(
+            "Content to write to the file. "
+            "IMPORTANT: For code files, use single newlines (\\n) between lines, "
+            "NOT double newlines (\\n\\n) which create extra blank lines."
+        )
     )
     create_directories: bool = Field(
         default=True,
@@ -46,7 +51,8 @@ class WriteFileTool(BaseTool[WriteFileInput, WriteFileOutput]):
     description = (
         "Create a new file or overwrite an existing file with content. "
         "For modifying existing files, prefer edit_file for precise changes. "
-        "Parent directories are created automatically."
+        "Parent directories are created automatically. "
+        "When writing code files, use proper formatting with single newlines between lines."
     )
     parallel_safe = False
     requires_lock = True
@@ -82,12 +88,20 @@ class WriteFileTool(BaseTool[WriteFileInput, WriteFileOutput]):
                 message=f"Parent directory does not exist: {path.parent}",
             )
 
+        # Normalize line endings for Windows
+        content = input_data.content
+        if sys.platform == "win32":
+            # Normalize to Unix first (handle mixed line endings)
+            content = content.replace("\r\n", "\n")
+            # Convert to Windows format (CRLF)
+            content = content.replace("\n", "\r\n")
+
         # Write file
         try:
-            async with aiofiles.open(path, "w", encoding="utf-8") as f:
-                await f.write(input_data.content)
+            async with aiofiles.open(path, "w", encoding="utf-8", newline="") as f:
+                await f.write(content)
 
-            bytes_written = len(input_data.content.encode("utf-8"))
+            bytes_written = len(content.encode("utf-8"))
 
             return WriteFileOutput(
                 success=True,

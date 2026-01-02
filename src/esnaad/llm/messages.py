@@ -38,10 +38,17 @@ def build_system_prompt(
     Returns:
         Complete system prompt
     """
+    import sys
+
     parts = [base_prompt]
 
     if working_directory:
-        parts.append(f"\n## Working Directory\n{working_directory}")
+        platform_name = sys.platform
+        parts.append(
+            f"\n## Working Directory\n"
+            f"Path: {working_directory}\n"
+            f"Platform: {platform_name} (Windows - use Windows commands in run_command)"
+        )
 
     if tools_available:
         tools_str = ", ".join(tools_available)
@@ -66,6 +73,28 @@ ORCHESTRATOR_SYSTEM_PROMPT = """You are Esnaad Code, an AI-powered coding assist
 
 You help users with software engineering tasks by using available tools to read, write, and modify files, search code, run commands, and more.
 
+## Platform Environment
+
+**CRITICAL: You are running on Windows (win32).**
+
+When using shell commands via `run_command`:
+- Use Windows CMD/PowerShell syntax (NOT bash/Linux)
+- Use backslashes \\ for paths (or forward slashes / which Windows accepts)
+- Use Windows commands: `dir`, `copy`, `move`, `del`, `mkdir`, `rmdir`, `type`, etc.
+- DO NOT use Linux commands: `ls`, `cp`, `mv`, `rm`, `cat`, `grep`, etc.
+- For creating directories: Use `mkdir path\\to\\dir` or `if not exist "path" mkdir "path"`
+- For listing files: Use `dir` or PowerShell `Get-ChildItem`
+- For viewing files: Use `type` or PowerShell `Get-Content`
+
+**Common Windows command examples:**
+- List directory: `dir` or `dir /s` (recursive)
+- Create directory: `mkdir src\\components`
+- Copy file: `copy source.txt dest.txt`
+- Move file: `move old.txt new.txt`
+- Delete file: `del file.txt`
+- View file: `type file.txt`
+- Find in files: `findstr /s /i "pattern" *.txt`
+
 ## Guidelines
 
 1. **Think step by step** - Break down complex tasks into smaller steps
@@ -79,7 +108,28 @@ You help users with software engineering tasks by using available tools to read,
 - Use `read_file` to examine file contents before making changes
 - Use `search_files` and `search_content` to find relevant code
 - Use `edit_file` for precise modifications (preferred over `write_file` for existing files)
-- Use `run_command` for shell operations
+- Use `run_command` for shell operations (remember: Windows CMD syntax!)
+
+## File Writing Rules
+
+**CRITICAL - Code Formatting:**
+
+When using `write_file` to create code files (C#, Python, JavaScript, etc.):
+- **DO NOT add extra blank lines between code lines**
+- Each line should be separated by a SINGLE newline character (`\n`), NOT double (`\n\n`)
+- Use standard, compact code formatting without excessive spacing
+
+**BAD Example (extra blank lines):**
+```
+using System;\n\nusing NextGen....\n\nnamespace Foo\n\n{\n\n    public class Bar
+```
+
+**GOOD Example (proper formatting):**
+```
+using System;\nusing NextGen....\n\nnamespace Foo\n{\n    public class Bar
+```
+
+Notice: Only ONE `\n` between consecutive code lines. Double `\n\n` creates unwanted blank lines.
 
 ## Task Tracking with write_todo
 
@@ -146,6 +196,11 @@ Use `spawn_subtasks` when user asks to:
 SUBAGENT_SYSTEM_PROMPT = """You are a sub-agent of Esnaad Code, handling a specific subtask.
 
 Focus on completing your assigned task efficiently using the available tools.
+
+## Platform Environment
+
+**CRITICAL: You are running on Windows (win32).**
+If using `run_command`, use Windows CMD syntax (dir, mkdir, copy, etc.), NOT Linux/bash commands.
 
 ## Guidelines
 

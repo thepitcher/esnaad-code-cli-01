@@ -15,7 +15,7 @@ class RunCommandInput(BaseModel):
     """Input schema for run_command tool."""
 
     command: str = Field(
-        description="Shell command to execute",
+        description="Windows shell command to execute (use CMD/PowerShell syntax, NOT bash/Linux)",
     )
     working_directory: str | None = Field(
         default=None,
@@ -54,7 +54,9 @@ class RunCommandTool(BaseTool[RunCommandInput, RunCommandOutput]):
 
     name = "run_command"
     description = (
-        "Execute a shell command and return its output. "
+        "Execute a Windows shell command (CMD/PowerShell) and return its output. "
+        "IMPORTANT: Use Windows syntax (dir, mkdir, copy, move, del, type, etc.), NOT Linux/bash commands. "
+        "Use backslashes or forward slashes for paths. "
         "Commands run in the working directory with a configurable timeout. "
         "Use for running builds, tests, git commands, etc. "
         "Avoid long-running or interactive commands."
