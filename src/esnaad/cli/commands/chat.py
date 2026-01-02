@@ -412,6 +412,39 @@ Timeout: {settings.orchestrator.timeout_seconds}s
         else:
             console.print("[dim]No rules loaded[/dim]")
 
+    elif cmd == "/debug-last-messages":
+        # Find the last user message index (skip automatic retry prompts)
+        retry_prompt = "Please provide your analysis and response based on the tool results above."
+        last_user_idx = -1
+
+        for i in range(len(orchestrator.messages) - 1, -1, -1):
+            msg = orchestrator.messages[i]
+            if msg.get("role") == "user":
+                # Skip automatic retry prompts - find the actual user message
+                if msg.get("content") != retry_prompt:
+                    last_user_idx = i
+                    break
+
+        if last_user_idx == -1:
+            console.print("[dim]No user messages found[/dim]")
+        else:
+            # Get all messages from last user message onwards
+            debug_messages = orchestrator.messages[last_user_idx:]
+
+            # Format and display
+            from esnaad.cli.ui.debug import format_debug_messages
+
+            formatted_output = format_debug_messages(debug_messages)
+
+            console.print(
+                Panel(
+                    formatted_output,
+                    title="[bold #E57B3A]Debug: Last Message Exchange[/bold #E57B3A]",
+                    border_style="#E57B3A",
+                    expand=False,
+                )
+            )
+
     elif cmd == "/mode":
         if plan_mode_state is not None:
             new_mode = plan_mode_state.toggle()

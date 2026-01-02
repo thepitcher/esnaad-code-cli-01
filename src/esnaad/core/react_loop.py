@@ -102,12 +102,14 @@ class ReActLoop:
         Run the ReAct loop.
 
         Args:
-            initial_messages: Starting messages (system + user)
+            initial_messages: Starting messages (system + user).
+                             This list is modified in place to include all
+                             assistant and tool messages.
 
         Returns:
             Final agent result
         """
-        state = ReActState(messages=list(initial_messages))
+        state = ReActState(messages=initial_messages)
 
         logger.info(
             "Starting ReAct loop",
