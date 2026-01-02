@@ -401,14 +401,10 @@ Timeout: {settings.orchestrator.timeout_seconds}s
     elif cmd == "/rules":
         rules_content = orchestrator._rules
         if rules_content:
-            # Truncate if too long for display
-            if len(rules_content) > 2000:
-                display_content = rules_content[:2000] + "\n\n[dim]... (truncated)[/dim]"
-            else:
-                display_content = rules_content
+            # Show full rules without truncation
             console.print(
                 Panel(
-                    Markdown(display_content),
+                    Markdown(rules_content),
                     title="[bold #E57B3A]Active Rules[/bold #E57B3A]",
                     border_style="#E57B3A",
                 )
