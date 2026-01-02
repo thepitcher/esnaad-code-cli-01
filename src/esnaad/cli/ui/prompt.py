@@ -17,7 +17,8 @@ from esnaad.state.plan_mode import ExecutionMode, PlanModeState
 # Prompt style (Claude Code orange)
 PROMPT_STYLE = Style.from_dict(
     {
-        "prompt": "bold #E57B3A",
+        "prompt": "bold #E57B3A",       # Orange for normal prompt
+        "plan-mode": "bold #00AA00",    # Green for [PLAN] indicator
         "continuation": "dim",
     }
 )
@@ -265,8 +266,15 @@ async def get_user_input_with_mode(
 
     # Dynamic prompt function - called each time prompt is rendered
     def get_prompt():
-        mode_prefix = "[PLAN] " if plan_mode_state.is_plan_mode else ""
-        return f"{mode_prefix}{prompt_text}"
+        if plan_mode_state.is_plan_mode:
+            # Return formatted text: green [PLAN] + orange >
+            return [
+                ("class:plan-mode", "[PLAN] "),
+                ("class:prompt", prompt_text),
+            ]
+        else:
+            # Return formatted text: just orange >
+            return [("class:prompt", prompt_text)]
 
     try:
         loop = asyncio.get_event_loop()

@@ -168,7 +168,7 @@ def print_mode_indicator(console: Console, mode: ExecutionMode) -> None:
     else:
         console.print(
             "[bold #E57B3A][[/bold #E57B3A]"
-            "[bold green]AUTO EDIT[/bold green]"
+            "[bold #E57B3A]AUTO EDIT[/bold #E57B3A]"
             "[bold #E57B3A]][/bold #E57B3A] "
             "[dim]Tools execute automatically[/dim]"
         )
@@ -189,6 +189,6 @@ def print_mode_toggle(console: Console, mode: ExecutionMode) -> None:
         )
     else:
         console.print(
-            "\n[bold green]Switched to Auto Edit[/bold green] - "
+            "\n[bold #E57B3A]Switched to Auto Edit[/bold #E57B3A] - "
             "[dim]All tools will execute automatically[/dim]"
         )

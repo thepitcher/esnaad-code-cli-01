@@ -325,4 +325,4 @@ class RulesLoader:
             Path to the rules file in the preset's subfolder
         """
         preset_lower = preset.lower()
-        return RULES_FOLDER / preset_lower / f"ESNAAD.{preset.upper()}.md"
+        return RULES_FOLDER / preset_lower / "esnaad.md"
