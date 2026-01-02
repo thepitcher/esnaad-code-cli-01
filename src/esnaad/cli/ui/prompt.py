@@ -10,6 +10,7 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.styles import Style
 from rich.console import Console
 
+from esnaad.cli.ui.autocomplete import create_slash_command_completer
 from esnaad.config.settings import get_settings
 from esnaad.state.plan_mode import ExecutionMode, PlanModeState
 
@@ -205,14 +206,14 @@ def create_prompt_session_with_mode(
     on_mode_toggle: Callable[[ExecutionMode], None] | None = None,
 ) -> PromptSession:
     """
-    Create a prompt session with Shift+Tab mode toggle support.
+    Create a prompt session with Shift+Tab mode toggle support and autocomplete.
 
     Args:
         plan_mode_state: The plan mode state to toggle.
         on_mode_toggle: Callback invoked when mode is toggled.
 
     Returns:
-        A PromptSession with custom key bindings.
+        A PromptSession with custom key bindings and autocomplete.
     """
     settings = get_settings()
     history_file = settings.config_dir / "history.txt"
@@ -229,12 +230,17 @@ def create_prompt_session_with_mode(
         # Invalidate the app to redraw prompt with new mode prefix
         event.app.invalidate()
 
+    # Create completer for slash commands
+    completer = create_slash_command_completer()
+
     return PromptSession(
         history=FileHistory(str(history_file)),
         style=PROMPT_STYLE,
         enable_history_search=True,
         multiline=False,
         key_bindings=kb,
+        completer=completer,
+        complete_while_typing=True,
     )
 
 

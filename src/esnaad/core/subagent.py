@@ -135,6 +135,7 @@ class SubAgent:
             config=react_config,
             tool_executor=self._execute_tool,
             tools_schema=tools_schema,
+            todo_manager=None,  # Subagents don't track todos
         )
 
         # Run the loop

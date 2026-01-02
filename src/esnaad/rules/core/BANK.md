@@ -1,144 +1,4 @@
 
----
-
-## Naming Conventions
-
-### Class Naming
-| Pattern | Example | Location |
-|---------|---------|----------|
-| `I{Name}Service` | `IEmailNotificationService` | Core/Service/ |
-| `{Name}Service` | `EmailNotificationService` | Core/Service/ |
-| `{Name}Facade` | `AssetManagementFacade` | App/Facade/ |
-| `I{Name}Repository` | `IAssetTransactionRepository` | Core/Repository/ |
-| `Nh{Name}Repository` | `NhAssetTransactionRepository` | Core/Repository/NHibernate/ |
-| `{Name}Api` | `UserApi` | App/API/ |
-| `{Name}Vo` | `AssetBreakDownListVo` | App/{Feature}/Vo/ |
-| `{Name}Finder` | `IAccessManagementFinder` | App/ |
-| `{Name}CommandHandler` | `AssetManagementCommandHandler` | Core/ |
-| `{Name}EventHandler` | `AssetManagementEventHandler` | Core/ |
-| `{Name}Map` | `AirBaseMap` | Core/Config/EntityMap/ |
-| `{Name}Id` | `AssetTransactionId` | Core/Shared/ |
-
-### Method Naming
-- **API methods**: Prefix with HTTP verb (`Get`, `Post`, `Put`, `Delete`)
-- **Handler methods**: `Handle(TCommand command)`
-- **Repository methods**: `Get()`, `Add()`, `Remove()`, `GetAndCheckVersion()`
-
-### File Organization
-- One class per file
-- File name matches class name exactly
-- Namespace mirrors directory structure
-
----
-
-## Code Patterns
-
-### 1. REST API Controller
-```csharp
-// Location: NextGen.[Module].App/API/{Name}Api.cs
-[RestService]
-public class AssetApi
-{
-    // Property injection
-    public ICommandBus CommandBus { private get; set; }
-    public IAssetFacade AssetFacade { private get; set; }
-
-    [Transaction(ReadOnly = true)]
-    [Uri(UriTemplate = "/asset/list")]
-    public IList<AssetVo> GetAssets()
-    {
-        return AssetFacade.GetAssets();
-    }
-
-    [Uri(UriTemplate = "/asset/save")]
-    public void PostSaveAsset(SaveAssetCommand command)
-    {
-        CommandBus.Send(command);
-    }
-}
-```
-
-**Key Attributes:**
-- `[RestService]` - Marks class as REST endpoint
-- `[Uri(UriTemplate = "...")]` - Maps method to URI
-- `[Transaction]` - Transaction boundary
-- `[Transaction(ReadOnly = true)]` - Read-only transaction
-- `[Secured(ResourceCodes = new[] { ... })]` - Authorization
-
-### 2. Command Pattern
-```csharp
-// Location: NextGen.[Module].Core/Shared/{Domain}/Command/{CommandName}.cs
-public class SaveConfiguration : ICommand
-{
-    public string Id { get; set; }
-    public long Version { get; set; }
-    public string Value { get; set; }
-    public string Description { get; set; }
-}
-```
-
-### 3. Command Handler
-```csharp
-// Location: NextGen.[Module].Core/{Feature}/{Name}CommandHandler.cs
-public class ConfigurationCommandHandler : IHandler<SaveConfiguration>, IHandler<DeleteConfiguration>
-{
-    public IConfigurationRepository ConfigurationRepository { private get; set; }
-
-    [Transaction]
-    public void Handle(SaveConfiguration o)
-    {
-        var configuration = ConfigurationRepository.Get(o.Id);
-        if (configuration == null)
-            CreateNewConfiguration(o);
-        else
-            UpdateConfiguration(o, configuration);
-    }
-}
-```
-
-### 4. Value Object (DTO)
-```csharp
-// Location: NextGen.[Module].App/{Feature}/Vo/{Name}Vo.cs
-public class AssetBreakDownListVo
-{
-    public string PartNo { get; set; }
-    public string MfrCode { get; set; }
-    public string Nomenclature { get; set; }
-    public string ClassCode { get; set; }
-    public int? Qty { get; set; }
-}
-```
-
-### 5. Facade Pattern
-```csharp
-// Location: NextGen.[Module].App/{Feature}/{Name}Facade.cs
-public class AssetManagementFacade
-{
-    public IAssetTransactionRepository AssetTransactionRepository { private get; set; }
-    public ICommandBus CommandBus { private get; set; }
-    public IModelMapper ModelMapper { private get; set; }
-
-    public IList<AssetVo> GetAssets(long commandId)
-    {
-        var assets = AssetTransactionRepository.FindByCommandId(commandId);
-        return ModelMapper.Map<IList<AssetVo>>(assets);
-    }
-}
-```
-
-### 6. AutoMapper Configuration
-```csharp
-// Location: NextGen.[Module].App/{Feature}/{Name}Mapper.cs
-public class AccessManagementLogMapper : IModelMapper
-{
-    public void Initialize(AutoMapper.IConfiguration cfg)
-    {
-        cfg.CreateMap<AccessManagementLog, AccessManagementLogVo>()
-           .ForMember(x => x.LogDateTime, opt => opt.MapFrom(s => s.DateTime))
-           .ReverseMap();
-    }
-}
-```
 
 ---
 
@@ -196,23 +56,7 @@ private const string Manage = SecuredResourceCodes.LogisticsDomain.AssetManageme
 
 ---
 
-## Shared Code Location
 
-All shared definitions are in: `NextGen.Admin.Core\Shared\`
-
-Structure:
-```
-Shared/
-├── Admin/           # Admin module shared code
-├── Logistic/        # Logistic module shared code
-│   ├── AssetManagement/
-│   │   ├── Command/
-│   │   ├── Event/
-│   │   └── {Entity}Id.cs
-├── Maintenance/
-├── Operation/
-└── ...
-```
 
 ---
 
@@ -257,13 +101,6 @@ Shared/
 
 ---
 
-## Entity Creation Guide
-
-### CRITICAL: When creating a new Entity, you MUST create these files together:
-
-```
-1. MAIN ENTITY FILE:                    src/modules/NextGen.[Module]/NextGen.[Module].Core/[Function]/Entity/[EntityName].cs
-```
 
 
 
@@ -487,34 +324,6 @@ public class [Entity]CommandHandler : IHandler<Save[Entity]>
 | `GetAndCheckVersion(TId id, long version)` | Get with optimistic locking check |
 ```
 
-## Build Verification
 
-After ANY file modification (create, update, or delete), you MUST:
 
-1. Run the build command to verify compilation succeeds
-2. If the build fails, fix the errors before proceeding
-3. Do not consider a task complete until the build passes
-
-### Build Command
-
-Run from the working directory root:
-
-```bash
-.\tools\nant\NAnt.exe build
-```
-
-If the build fails, analyze the error output and fix the issues before proceeding.
-
-### When to Skip Build
-
-You may skip build verification only when:
-- Modifying documentation files (.md, .txt, .rst)
-- Modifying configuration files (.env, .gitignore)
-- The user explicitly says to skip verification
-
-## Code Quality
-
-- All .cs files must have valid syntax
-- Imports must be resolvable
-- Type hints are preferred for function signatures
 

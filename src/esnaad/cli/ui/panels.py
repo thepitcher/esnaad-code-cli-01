@@ -34,7 +34,7 @@ def print_welcome(console: Console, settings: Settings) -> None:
     # Print info panel
     console.print(
         Panel(
-            f"[bold]v{__version__}[/bold] - [dim]ASKMAI-powered agentic coding assistant[/dim]\n\n"
+            f"[bold]v{__version__}[/bold] - ASKMAI-powered agentic coding assistant\n\n"
             f"Model: [#E57B3A]{settings.llm.model}[/#E57B3A]\n"
             f"Working Directory: [#E57B3A]{settings.working_directory}[/#E57B3A]\n\n"
             "[dim]Type /help for commands, /exit to quit[/dim]\n"

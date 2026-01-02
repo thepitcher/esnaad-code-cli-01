@@ -21,16 +21,16 @@
 core/
 ├── src/
 │   ├── modules/                    
-│   │   ├── NextGen.Admin/          # Administration
-│   │   │   ├── NextGen.Admin.Core/     # Domain logic, entities, repositories
-│   │   │   └── NextGen.Admin.App/      # Facades, APIs, VOs
-│   │   ├── NextGen.Logistic/       # Logistics & Asset Management
+│   │   ├── NextGen.Admin/          # Administration Domain
+│   │   │   ├── NextGen.Admin.Core/     # Domain logic, entities, repositories, Command Handler, Event Handler, Services
+│   │   │   └── NextGen.Admin.App/      # Facades, Finder, VOs
+│   │   ├── NextGen.Logistic/       # Logistics Domain
 │   │   │   ├── NextGen.Logistic.Core/
 │   │   │   └── NextGen.Logistic.App/
-│   │   ├── NextGen.Maintenance/    # Maintenance module
-│   │   ├── NextGen.Operation/      # Operations module
-│   │   ├── NextGen.Pmco/           # PMCO module
-│   │   └── NextGen.Ammo/           # Ammunition module
+│   │   ├── NextGen.Maintenance/    # Maintenance Domain
+│   │   ├── NextGen.Operation/      # Operations Domain
+│   │   ├── NextGen.Pmco/           # PMCO Domain
+│   │   └── NextGen.Ammo/           # Ammunition Domain
 │   ├── server/                     # Core server components
 │   ├── runtime/                    # HTTP runtime (entry point)
 │   │   └── NextGen.Runtime.Http/
@@ -42,11 +42,34 @@ core/
 ```
 
 ### Domain Pattern
-Every domain (Admin, Ammo, Logistic, Operation, etc) reside under src/modules/`NextGen.[Domain]` and follows **Core + App** separation:
+Every domain (Admin, Ammo, Logistic, Operation, etc) reside under src/modules and follows **Core + App** separation:
 - **`NextGen.[Domain].Core`** - Domain entities, repositories, command handlers, event handlers, services
 - **`NextGen.[Domain].App`** - Facades, APIs, VOs (Value Objects), finders
 
+example project structure for Logistics (LOG) Domain
+- main path : src\modules\NextGen.Logistic
+- Logistic core path: src\modules\NextGen.Logistic\NextGen.Logistic.Core
+- Logistic App path: src\modules\NextGen.Logistic\NextGen.Logistic.App
 ---
+
+### Module Pattern
+Module name should be in Pascal case. Each module live under NextGen.[Domain].Core for core implementation and `NextGen.[Domain].App for App implementation.
+
+This is structure for NextGen.[Domain].Core:
+- Entity. Example: src\modules\NextGen.Logistic\NextGen.Logistic.Core\PurchaseOrderManagement\Entity\PurchaseOrder.cs
+- Repository interface. Example: src\modules\NextGen.Logistic\NextGen.Logistic.Core\PurchaseOrderManagement\Repository\IPurchaseOrderRepository.cs
+- Hibernate Repository. Example: src\modules\NextGen.Logistic\NextGen.Logistic.Core\PurchaseOrderManagement\Repository\NHibernate\NhPurchaseOrderRepository.cs
+- Command Handler. Example: src\modules\NextGen.Logistic\NextGen.Logistic.Core\PurchaseOrderManagement\PurchaseOrderManagementCommandHandler.cs
+- Event Handler (optional). Example: c:\Workspace\Esnaad\Esnaad_03\core\src\modules\NextGen.Logistic\NextGen.Logistic.Core\PurchaseOrderManagement\PurchaseOrderManagementEventHandler.cs
+
+This is structure for NextGen.[Domain].App:
+- Facade. Example: src\modules\NextGen.Logistic\NextGen.Logistic.App\PurchaseManagement\
+- Finder interface. Example: src\modules\NextGen.Logistic\NextGen.Logistic.App\PurchaseManagement\IPurchaseManagementFinder.cs
+- Finder Hibernate. Example: src\modules\NextGen.Logistic\NextGen.Logistic.App\PurchaseManagement\NhPurchaseManagementFinder.cs
+- VO. Example: src\modules\NextGen.Logistic\NextGen.Logistic.App\PurchaseManagement\Vo\POItemsListVo.cs
+---
+
+### NextGen.[Domain].App structures
 
 ## Shared Code Location
 

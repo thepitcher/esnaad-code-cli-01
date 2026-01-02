@@ -65,6 +65,7 @@ class ReActLoop:
         on_thinking_start: Callable[[], Awaitable[None] | None] | None = None,
         on_thinking_end: Callable[[], Awaitable[None] | None] | None = None,
         on_tool_approval: Callable[[ToolCall], Awaitable[bool]] | None = None,
+        todo_manager: Any | None = None,
     ) -> None:
         """
         Initialize the ReAct loop.
@@ -81,6 +82,7 @@ class ReActLoop:
             on_thinking_start: Callback when LLM request starts
             on_thinking_end: Callback when LLM request ends
             on_tool_approval: Callback to request approval for destructive tools
+            todo_manager: Optional TodoManager to check for incomplete tasks
         """
         self.llm = llm_client
         self.config = config
@@ -93,6 +95,7 @@ class ReActLoop:
         self.on_thinking_start = on_thinking_start
         self.on_thinking_end = on_thinking_end
         self.on_tool_approval = on_tool_approval
+        self.todo_manager = todo_manager
 
     async def run(
         self,
@@ -243,6 +246,28 @@ class ReActLoop:
                     "content": "Please provide your analysis and response based on the tool results above.",
                 })
                 return None  # Continue loop
+
+            # Check for incomplete todos before exiting
+            # If todos exist and are not all completed, prompt to continue
+            # Note: We check todos regardless of retry limit - max_iterations will prevent infinite loops
+            if self.todo_manager and has_previous_tool_calls:
+                todo_list = self.todo_manager.todos
+                if not todo_list.is_empty and not todo_list.is_all_completed:
+                    logger.warning(
+                        "Model stopped but todos are incomplete, prompting to continue",
+                        iteration=state.iteration,
+                        completed=todo_list.completed_count,
+                        total=todo_list.total_count,
+                    )
+                    # Prompt the model to continue with remaining todos
+                    state.messages.append({
+                        "role": "user",
+                        "content": (
+                            f"You have incomplete tasks ({todo_list.completed_count}/{todo_list.total_count} completed). "
+                            "Please continue working on the remaining tasks. Use tools to complete them."
+                        ),
+                    })
+                    return None  # Continue loop
 
             logger.info(
                 "ReAct loop complete",

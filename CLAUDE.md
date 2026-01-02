@@ -444,6 +444,23 @@ No major known issues. All core features implemented.
   - "Approve All" option to approve remaining tools for current message
 - Project status: Feature complete with Plan Mode
 
+### Session 7 (2026-01-02)
+- Fixed Phase 12: Todo Completion Bug
+  - **Issue**: ReAct loop was exiting prematurely when LLM returned text without tool calls, even with incomplete todos
+  - **Root Cause**: Exit logic at `react_loop.py:218-257` only checked for empty responses, not incomplete todos
+  - **Fix Implemented (First Attempt)**:
+    - Added `todo_manager` parameter to `ReActLoop.__init__()`
+    - Added todo completion check before exit (lines 250-269 in react_loop.py)
+    - If todos exist and are incomplete, prompts LLM to continue
+    - Integrated `TodoManager` from orchestrator into ReAct loop
+    - Updated `Orchestrator.run()` to pass `_todo_manager` to ReActLoop
+    - Updated `SubAgent` to explicitly pass `todo_manager=None`
+  - **Bug in First Fix**: Used `retry_limit_not_reached` condition (iteration < 3), causing check to fail after 3 iterations
+  - **Second Fix**: Removed retry limit from todo check - now checks ALWAYS when todos are incomplete
+  - **Behavior**: System now detects incomplete todos at any iteration and prompts model to continue
+  - **Safety**: `max_iterations` limit still prevents infinite loops
+- Project status: Bug fix complete, todo tracking now reliable
+
 ## Registered Tools (11 Total)
 
 | Category | Tool | Description |

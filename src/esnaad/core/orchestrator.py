@@ -204,6 +204,7 @@ class Orchestrator:
             on_thinking_start=self.on_thinking_start,
             on_thinking_end=self.on_thinking_end,
             on_tool_approval=self.on_tool_approval,
+            todo_manager=self._todo_manager,
         )
 
         # Run the loop
