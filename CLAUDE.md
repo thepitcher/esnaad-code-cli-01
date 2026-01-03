@@ -474,18 +474,30 @@ No major known issues. All core features implemented.
 - Enhanced Entity Creation Rules Documentation
   - **Issue**: User needed comprehensive entity creation rules for LLM to follow automatically
   - **Changes Made**:
-    - Expanded `src/esnaad/rules/core/entity-creation.md` from 40 to 294 lines
+    - Expanded `src/esnaad/rules/core/entity-creation.md` from 40 to 470+ lines
     - Added "When to Create an Entity" trigger section with request patterns
     - Added step-by-step workflow (Step 1: Identify Location, Step 2: Create ID Class, Step 3: Create Entity)
     - Added complete templates for both ID class and Entity class with `[EntityName]` placeholders
     - Added "Pattern Requirements (MANDATORY)" checklist with 9 requirements
     - Added File Naming Conventions table with examples
     - Expanded examples: UnitOfMeasure (Logistic) + new WeightBalance (Maintenance) example
-    - Added "Quick Reference: Creation Checklist" with 14 verification steps
+    - **Property Types and Import Resolution** (NEW - lines 115-287):
+      - Classification: Primitive Types, ObjectId of Primitive Type, Entity References
+      - Rule 1: Primitives (string, int, bool, etc.) - no imports
+      - Rule 2: ObjectId lookup values - ALWAYS from `NextGen.Admin.Core.Shared.[Domain].[Module]`
+      - Rule 3: Entity references - search with `search_files` to find import path
+      - Common entity reference locations table (DataRestriction, Platform, Item, etc.)
+      - Import resolution workflow with step-by-step instructions
+      - Complete D161Master example showing all property types with comments
+      - Quick Decision Tree for property type determination
+    - Updated "Quick Reference: Creation Checklist" from 14 to 19 steps (organized into Structure/Properties/Constructors/Final Checks)
     - Added Windows command notes for directory creation
     - **Code Formatting Fix**: Added "Code Formatting" section to prevent extra blank lines in generated code
   - **Structure**: File already included in main esnaad.md via `<!-- #include entity-creation.md -->`
-  - **Behavior**: When user requests "Create a new Entity for [Module]", LLM will automatically follow the complete workflow
+  - **Behavior**:
+    - When user requests "Create a new Entity for [Module]", LLM will automatically follow the complete workflow
+    - LLM will properly classify property types and add correct imports
+    - For entity references, LLM will use `search_files` to locate entities and extract import namespaces
 - Fixed Code Formatting Issue (Multiple Layers)
   - **Issue**: LLM was generating C# files with extra blank lines between each line of code
   - **Root Cause**: LLM was using `\n\n` (double newline) instead of `\n` (single newline) when constructing file content

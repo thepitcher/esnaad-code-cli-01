@@ -112,6 +112,180 @@ namespace NextGen.[Domain].Core.[Module].Entity
 
 ---
 
+## Property Types and Import Resolution
+
+### Property Type Classification
+
+Entity properties can be one of three types:
+
+1. **Primitive Types** - No imports needed
+   - `string`, `int`, `int?`, `bool`, `bool?`, `decimal`, `decimal?`, `DateTime`, `DateTime?`
+   - Example: `public virtual string Name { get; protected set; }`
+
+2. **ObjectId of Primitive Type** - Import from Admin domain Shared
+   - Used for dropdown/lookup values (categories, codes, types, etc.)
+   - **ALWAYS** in: `NextGen.Admin.Core.Shared.[Domain].[Module]`
+   - Example: `IntervalCategory`, `WorkUnitCode`, `VehicleType`
+   - Example property: `public virtual IntervalCategory IntervalCategory { get; set; }`
+
+3. **Entity References** - Import from actual entity location
+   - References to other domain entities
+   - Can be from same domain or different domain
+   - Search required to find import path
+   - Example: `Platform`, `Item`, `DataRestriction`
+   - Example property: `public virtual Platform Platform { get; protected set; }`
+
+### Import Resolution Rules
+
+**Rule 1: Primitive Types**
+- No import needed
+- Use directly in properties
+
+**Rule 2: ObjectId of Primitive Type (Lookup Values)**
+- **Always import from**: `NextGen.Admin.Core.Shared.[Domain].[Module]`
+- Pattern: `using NextGen.Admin.Core.Shared.[Domain].[Module];`
+- Examples:
+  ```csharp
+  using NextGen.Admin.Core.Shared.Maintenance._2408_16_1;  // IntervalCategory, WorkUnitCode
+  using NextGen.Admin.Core.Shared.Logistic.Master;          // UnitOfMeasureCategory
+  using NextGen.Admin.Core.Shared.Operation.Mission;        // MissionType, MissionStatus
+  ```
+
+**Rule 3: Entity References**
+
+You MUST search for the entity to find its import path:
+
+**Step 1: Search for the entity file**
+```
+Use search_files tool: search_files(pattern="Platform.cs", path="src/modules")
+```
+
+**Step 2: Determine import namespace from file path**
+- If found in: `src/modules/NextGen.Admin/NextGen.Admin.Core/Shared/Logistic/ItemCatalogue/Entity/Platform.cs`
+- Import namespace: `NextGen.Admin.Core.Shared.Logistic.ItemCatalogue.Entity`
+
+**Step 3: Add using statement**
+```csharp
+using NextGen.Admin.Core.Shared.Logistic.ItemCatalogue.Entity;  // Platform
+```
+
+### Common Entity Reference Locations
+
+| Entity | Typical Location | Import Namespace |
+|--------|-----------------|------------------|
+| `DataRestriction` (Command) | Admin/Security | `NextGen.Admin.Core.Security.Entity` |
+| `Platform` | Admin/Logistic/ItemCatalogue | `NextGen.Admin.Core.Shared.Logistic.ItemCatalogue.Entity` |
+| `Item` | Admin/Logistic/ItemCatalogue | `NextGen.Admin.Core.Shared.Logistic.ItemCatalogue.Entity` |
+| `Unit` | Admin/Organization | `NextGen.Admin.Core.Organization.Entity` |
+| `User` | Admin/Security | `NextGen.Admin.Core.Security.Entity` |
+
+### Import Resolution Workflow
+
+When you encounter a non-primitive property type:
+
+1. **Check if it's a primitive ObjectId (lookup value)**:
+   - Ends with common patterns: `Category`, `Type`, `Status`, `Code`
+   - Import from: `NextGen.Admin.Core.Shared.[Domain].[Module]`
+
+2. **Otherwise, it's an entity reference**:
+   - Use `search_files` to find `[EntityName].cs`
+   - Extract namespace from file path
+   - Add appropriate using statement
+
+3. **Self-reference (same entity)**:
+   - No import needed
+   - Example: `public virtual D161Master ParentMaster { get; protected set; }`
+
+### Example: Complex Entity with Mixed Property Types
+
+```csharp
+using System;
+using NextGen.Admin.Core.Entity;                                      // NgAuditEntry
+using NextGen.Admin.Core.Security.Entity;                             // DataRestriction (entity)
+using NextGen.Admin.Core.Shared.Logistic.ItemCatalogue.Entity;       // Platform, Item (entities)
+using NextGen.Admin.Core.Shared.Maintenance._2408_16_1;              // IntervalCategory, WorkUnitCode (ObjectIds)
+using NextGen.Maintenance.Core._2408_16.Entity;                      // D161Fault (entity, same domain)
+using NextGen.Support.Base.Entity;                                    // EntityBase
+
+namespace NextGen.Maintenance.Core._2408_16_1.Entity
+{
+    public class D161Master : EntityBase<D161MasterId>, INgAuditable
+    {
+        // Standard auditable property
+        public virtual NgAuditEntry AuditEntry { get; protected set; }
+
+        // Entity references (from other domains)
+        public virtual DataRestriction Command { get; protected set; }      // Admin.Security
+        public virtual Platform Platform { get; protected set; }            // Admin.Logistic
+        public virtual Item EndItem { get; protected set; }                 // Admin.Logistic
+        public virtual Item Component { get; protected set; }               // Admin.Logistic
+
+        // Primitive types
+        public virtual int? Level { get; protected set; }
+        public virtual int? Overhaul { get; set; }
+        public virtual int? Replace { get; set; }
+        public virtual bool IsReplaceNha { get; set; }
+        public virtual string HierarchyCode { get; set; }
+
+        // ObjectId of primitive type (lookup values)
+        public virtual IntervalCategory IntervalCategory { get; set; }     // Admin.Shared
+        public virtual WorkUnitCode WorkUnitCode { get; set; }             // Admin.Shared
+
+        // Entity reference (same domain)
+        public virtual D161Fault FaultInfo { get; set; }                   // Maintenance._2408_16
+
+        // Self-reference
+        public virtual D161Master ParentMaster { get; protected set; }
+
+        protected D161Master()
+        {
+            Id = D161MasterId.Of(Guid.NewGuid());
+        }
+
+        public D161Master(
+            DataRestriction command,
+            Platform platform,
+            Item endItem,
+            Item component,
+            int? level,
+            D161Master parentMaster = null)
+        {
+            Command = command;
+            Platform = platform;
+            EndItem = endItem;
+            Component = component;
+            Level = level;
+            ParentMaster = parentMaster;
+        }
+    }
+}
+```
+
+### Quick Decision Tree
+
+When adding a property to an entity:
+
+```
+Is the type a C# primitive (string, int, bool, DateTime)?
+├─ YES → No import needed
+└─ NO → Continue...
+
+Does it end with Category/Type/Status/Code and is a lookup value?
+├─ YES → Import from: NextGen.Admin.Core.Shared.[Domain].[Module]
+└─ NO → Continue...
+
+Is it the same entity (self-reference)?
+├─ YES → No import needed
+└─ NO → Continue...
+
+It's an entity reference:
+└─ Use search_files to find [EntityName].cs
+   └─ Extract namespace from file path
+      └─ Add using statement
+```
+
+---
+
 ## File Naming Conventions
 
 | Component | Pattern | Example (WeightBalance in Maintenance) |
@@ -255,6 +429,7 @@ namespace NextGen.Maintenance.Core.WeightBalance.Entity
 
 When creating an entity, verify:
 
+### Structure
 1. ☐ Determined correct Domain and Module
 2. ☐ Created ID class in `Shared/[Domain]/[Module]/` directory
 3. ☐ ID class inherits from `EntityId` with private constructor
@@ -262,13 +437,24 @@ When creating an entity, verify:
 5. ☐ Created Entity class in `[Module]/Entity/` directory
 6. ☐ Entity inherits from `EntityBase<[EntityName]Id>`
 7. ☐ Entity implements `INgAuditable`
+
+### Properties
 8. ☐ All properties are `virtual` with `protected set`
-9. ☐ Protected parameterless constructor exists
-10. ☐ Public constructor with parameters exists
-11. ☐ ID initialized in protected constructor
-12. ☐ ReSharper comments added
-13. ☐ Correct namespaces used
-14. ☐ Used `write_file` tool to create both files
+9. ☐ Identified primitive types (no import needed)
+10. ☐ Identified ObjectId properties (import from Admin.Core.Shared)
+11. ☐ Identified entity references (searched for import paths)
+12. ☐ Added all necessary using statements at the top
+
+### Constructors
+13. ☐ Protected parameterless constructor exists
+14. ☐ Public constructor with parameters exists
+15. ☐ ID initialized in protected constructor
+16. ☐ ReSharper comments added
+
+### Final Checks
+17. ☐ Correct namespaces used
+18. ☐ All imports resolved correctly
+19. ☐ Used `write_file` tool to create both files
 
 ---
 
