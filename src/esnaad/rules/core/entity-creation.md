@@ -116,7 +116,7 @@ namespace NextGen.[Domain].Core.[Module].Entity
 
 ### Property Type Classification
 
-Entity properties can be one of three types:
+Entity properties can be one of FOUR types:
 
 1. **Primitive Types** - No imports needed
    - `string`, `int`, `int?`, `bool`, `bool?`, `decimal`, `decimal?`, `DateTime`, `DateTime?`
@@ -128,12 +128,49 @@ Entity properties can be one of three types:
    - Example: `IntervalCategory`, `WorkUnitCode`, `VehicleType`
    - Example property: `public virtual IntervalCategory IntervalCategory { get; set; }`
 
-3. **Entity References** - Import from actual entity location
-   - References to other domain entities
-   - Can be from same domain or different domain
+3. **EntityId References** - ID only (lightweight references)
+   - Stores just the ID of a related entity, NOT the full entity
+   - Property name typically ends with `Id` (e.g., `CommandId`, `PlatformId`)
+   - Type is the `[EntityName]Id` class (e.g., `DataRestrictionId`, `PlatformId`, `ItemId`)
+   - Must search to find the EntityId class location
+   - Examples:
+     - `public virtual DataRestrictionId CommandId { get; set; }`
+     - `public virtual PlatformId PlatformId { get; set; }`
+     - `public virtual ItemId MajorEndItemId { get; set; }`
+
+4. **Entity References** - Full entity object (NHibernate lazy loading)
+   - Stores reference to the full entity object
+   - NHibernate can lazy-load the related entity
+   - Property name is the entity name (e.g., `Command`, `Platform`)
+   - Type is the entity class (e.g., `DataRestriction`, `Platform`, `Item`)
    - Search required to find import path
-   - Example: `Platform`, `Item`, `DataRestriction`
-   - Example property: `public virtual Platform Platform { get; protected set; }`
+   - Examples:
+     - `public virtual DataRestriction Command { get; protected set; }`
+     - `public virtual Platform Platform { get; protected set; }`
+     - `public virtual Item EndItem { get; protected set; }`
+
+### When to Use EntityId vs Entity Reference
+
+**Use `EntityId` type when:**
+- Property name ends with `Id` (e.g., `CommandId`, `PlatformId`)
+- You only need to store the reference ID
+- You want lightweight properties
+- User explicitly specifies the Id type (e.g., "CommandId (DataRestrictionId)")
+
+**Use `Entity` type when:**
+- Property name is the entity name (e.g., `Command`, `Platform`)
+- You need access to the full entity object
+- NHibernate will lazy-load the related entity
+- User specifies without Id suffix (e.g., "Command (DataRestriction)")
+
+**Example comparison:**
+```csharp
+// ID Reference (lightweight)
+public virtual DataRestrictionId CommandId { get; set; }
+
+// Entity Reference (lazy loading)
+public virtual DataRestriction Command { get; protected set; }
+```
 
 ### Import Resolution Rules
 
@@ -151,7 +188,27 @@ Entity properties can be one of three types:
   using NextGen.Admin.Core.Shared.Operation.Mission;        // MissionType, MissionStatus
   ```
 
-**Rule 3: Entity References**
+**Rule 3: EntityId References (ID-only properties)**
+
+You MUST search for the EntityId class to find its import path:
+
+**Step 1: Search for the EntityId file**
+```
+Use search_files tool: search_files(pattern="DataRestrictionId.cs", path="src/modules")
+```
+
+**Step 2: Determine import namespace from file path**
+- If found in: `src/modules/NextGen.Admin/NextGen.Admin.Core/Shared/Admin/Security/DataRestrictionId.cs`
+- Import namespace: `NextGen.Admin.Core.Shared.Admin.Security`
+
+**Step 3: Add using statement**
+```csharp
+using NextGen.Admin.Core.Shared.Admin.Security;  // DataRestrictionId
+```
+
+**Important:** EntityId classes are typically in the `Shared/[Domain]/[Module]/` directory structure.
+
+**Rule 4: Entity References (Full entity objects)**
 
 You MUST search for the entity to find its import path:
 
@@ -168,6 +225,16 @@ Use search_files tool: search_files(pattern="Platform.cs", path="src/modules")
 ```csharp
 using NextGen.Admin.Core.Shared.Logistic.ItemCatalogue.Entity;  // Platform
 ```
+
+### Common EntityId Reference Locations
+
+| EntityId | Typical Location | Import Namespace |
+|----------|-----------------|------------------|
+| `DataRestrictionId` | Admin/Security | `NextGen.Admin.Core.Shared.Admin.Security` |
+| `PlatformId` | Admin/Logistic/ItemCatalogue | `NextGen.Admin.Core.Shared.Logistic.ItemCatalogue` |
+| `ItemId` | Admin/Logistic/ItemCatalogue | `NextGen.Admin.Core.Shared.Logistic.ItemCatalogue` |
+| `UnitId` | Admin/Organization | `NextGen.Admin.Core.Shared.Admin.Organization` |
+| `UserId` | Admin/Security | `NextGen.Admin.Core.Shared.Admin.Security` |
 
 ### Common Entity Reference Locations
 
@@ -187,12 +254,19 @@ When you encounter a non-primitive property type:
    - Ends with common patterns: `Category`, `Type`, `Status`, `Code`
    - Import from: `NextGen.Admin.Core.Shared.[Domain].[Module]`
 
-2. **Otherwise, it's an entity reference**:
+2. **Check if property name ends with `Id`**:
+   - This indicates an EntityId reference (not full entity)
+   - Use `search_files` to find `[EntityName]Id.cs`
+   - EntityId classes are in `Shared/[Domain]/[Module]/` directory
+   - Extract namespace from file path
+   - Add appropriate using statement
+
+3. **Otherwise, it's an entity reference**:
    - Use `search_files` to find `[EntityName].cs`
    - Extract namespace from file path
    - Add appropriate using statement
 
-3. **Self-reference (same entity)**:
+4. **Self-reference (same entity)**:
    - No import needed
    - Example: `public virtual D161Master ParentMaster { get; protected set; }`
 
@@ -274,14 +348,70 @@ Does it end with Category/Type/Status/Code and is a lookup value?
 ├─ YES → Import from: NextGen.Admin.Core.Shared.[Domain].[Module]
 └─ NO → Continue...
 
+Does the property NAME end with 'Id' (e.g., CommandId, PlatformId)?
+├─ YES → It's an EntityId reference (lightweight)
+│   └─ Use search_files to find [EntityName]Id.cs
+│      └─ Extract namespace from file path (typically Shared/[Domain]/[Module])
+│         └─ Add using statement
+└─ NO → Continue...
+
 Is it the same entity (self-reference)?
 ├─ YES → No import needed
 └─ NO → Continue...
 
-It's an entity reference:
+It's an entity reference (full entity):
 └─ Use search_files to find [EntityName].cs
    └─ Extract namespace from file path
       └─ Add using statement
+```
+
+### Example: Entity with EntityId Properties (Lightweight References)
+
+```csharp
+using System;
+using NextGen.Admin.Core.Entity;                                      // NgAuditEntry
+using NextGen.Admin.Core.Shared.Admin.Security;                       // DataRestrictionId
+using NextGen.Admin.Core.Shared.Logistic.ItemCatalogue;              // PlatformId, ItemId
+using NextGen.Support.Base.Entity;                                    // EntityBase
+
+namespace NextGen.Maintenance.Core.MissionEquipment.Entity
+{
+    public class MasterEquipment : EntityBase<MasterEquipmentId>, INgAuditable
+    {
+        public virtual NgAuditEntry AuditEntry { get; protected set; }
+
+        // EntityId properties (ID references only - lightweight)
+        public virtual DataRestrictionId CommandId { get; set; }
+        public virtual PlatformId PlatformId { get; set; }
+        public virtual ItemId MajorEndItemId { get; set; }
+        public virtual ItemId EquipmentId { get; set; }
+
+        // Primitive properties
+        public virtual string Reference { get; set; }
+        public virtual string Remarks { get; set; }
+
+        protected MasterEquipment()
+        {
+            Id = MasterEquipmentId.Of(Guid.NewGuid());
+        }
+
+        public MasterEquipment(
+            DataRestrictionId commandId,
+            PlatformId platformId,
+            ItemId majorEndItemId,
+            ItemId equipmentId,
+            string reference,
+            string remarks)
+        {
+            CommandId = commandId;
+            PlatformId = platformId;
+            MajorEndItemId = majorEndItemId;
+            EquipmentId = equipmentId;
+            Reference = reference;
+            Remarks = remarks;
+        }
+    }
+}
 ```
 
 ---

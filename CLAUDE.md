@@ -474,30 +474,40 @@ No major known issues. All core features implemented.
 - Enhanced Entity Creation Rules Documentation
   - **Issue**: User needed comprehensive entity creation rules for LLM to follow automatically
   - **Changes Made**:
-    - Expanded `src/esnaad/rules/core/entity-creation.md` from 40 to 470+ lines
+    - Expanded `src/esnaad/rules/core/entity-creation.md` from 40 to 540+ lines
     - Added "When to Create an Entity" trigger section with request patterns
     - Added step-by-step workflow (Step 1: Identify Location, Step 2: Create ID Class, Step 3: Create Entity)
     - Added complete templates for both ID class and Entity class with `[EntityName]` placeholders
     - Added "Pattern Requirements (MANDATORY)" checklist with 9 requirements
     - Added File Naming Conventions table with examples
-    - Expanded examples: UnitOfMeasure (Logistic) + new WeightBalance (Maintenance) example
-    - **Property Types and Import Resolution** (NEW - lines 115-287):
-      - Classification: Primitive Types, ObjectId of Primitive Type, Entity References
+    - Expanded examples: UnitOfMeasure (Logistic) + WeightBalance (Maintenance) + MasterEquipment (EntityId example)
+    - **Property Types and Import Resolution** (lines 115-416):
+      - Classification: **4 types** - Primitives, ObjectId, EntityId References, Entity References
       - Rule 1: Primitives (string, int, bool, etc.) - no imports
       - Rule 2: ObjectId lookup values - ALWAYS from `NextGen.Admin.Core.Shared.[Domain].[Module]`
-      - Rule 3: Entity references - search with `search_files` to find import path
+      - Rule 3: **EntityId References** (NEW) - ID-only properties (lightweight)
+        - Property name ends with `Id` (e.g., `CommandId`, `PlatformId`)
+        - Type is `[EntityName]Id` class (e.g., `DataRestrictionId`, `ItemId`)
+        - Search for `[EntityName]Id.cs` in Shared directory
+      - Rule 4: Entity references - search with `search_files` to find import path
+      - "When to Use EntityId vs Entity Reference" decision guide
+      - Common EntityId locations table (DataRestrictionId, PlatformId, ItemId, etc.)
       - Common entity reference locations table (DataRestriction, Platform, Item, etc.)
       - Import resolution workflow with step-by-step instructions
-      - Complete D161Master example showing all property types with comments
-      - Quick Decision Tree for property type determination
+      - Complete D161Master example showing Entity references
+      - Complete MasterEquipment example showing EntityId references
+      - Updated Quick Decision Tree to include EntityId property name check
     - Updated "Quick Reference: Creation Checklist" from 14 to 19 steps (organized into Structure/Properties/Constructors/Final Checks)
     - Added Windows command notes for directory creation
     - **Code Formatting Fix**: Added "Code Formatting" section to prevent extra blank lines in generated code
   - **Structure**: File already included in main esnaad.md via `<!-- #include entity-creation.md -->`
   - **Behavior**:
     - When user requests "Create a new Entity for [Module]", LLM will automatically follow the complete workflow
-    - LLM will properly classify property types and add correct imports
-    - For entity references, LLM will use `search_files` to locate entities and extract import namespaces
+    - LLM will properly classify property types (including EntityId vs Entity distinction)
+    - **Property name ending detection**: If property ends with `Id`, uses EntityId type; otherwise uses Entity type
+    - For entity/entityId references, LLM will use `search_files` to locate and extract import namespaces
+    - Example: "CommandId (DataRestrictionId)" → creates `public virtual DataRestrictionId CommandId { get; set; }`
+    - Example: "Command (DataRestriction)" → creates `public virtual DataRestriction Command { get; protected set; }`
 - Fixed Code Formatting Issue (Multiple Layers)
   - **Issue**: LLM was generating C# files with extra blank lines between each line of code
   - **Root Cause**: LLM was using `\n\n` (double newline) instead of `\n` (single newline) when constructing file content
