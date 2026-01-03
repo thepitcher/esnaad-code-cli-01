@@ -16,7 +16,6 @@ from esnaad.cli.ui.panels import (
     print_thinking,
     print_error,
     print_assistant_message,
-    print_tool_call,
     print_tool_result,
     print_mode_indicator,
     print_mode_toggle,
@@ -246,6 +245,9 @@ _streaming_in_progress = False
 # Track the thinking spinner
 _thinking_spinner: Status | None = None
 
+# Cache tool calls for displaying results with original arguments
+_tool_call_cache: dict[str, ToolCall] = {}
+
 
 def _on_content(console: Console, content: str) -> None:
     """Callback for complete content (non-streaming)."""
@@ -293,24 +295,39 @@ def _on_thinking_end(console: Console) -> None:
 
 def _on_tool_call(console: Console, tool_call: ToolCall) -> None:
     """Callback when a tool is called."""
-    global _thinking_spinner
+    global _thinking_spinner, _tool_call_cache
     # Stop spinner if still running
     if _thinking_spinner is not None:
         _thinking_spinner.stop()
         _thinking_spinner = None
     _reset_streaming_state()  # End any streaming before tool output
-    print_tool_call(console, tool_call.name, tool_call.arguments)
+
+    # Cache tool call for result display (result will show the friendly format)
+    _tool_call_cache[tool_call.id] = tool_call
+
+    # Note: We don't print tool call here - the result display will show it with colored indicator
 
 
 def _on_tool_result(console: Console, result: ToolResult) -> None:
     """Callback when a tool returns."""
+    global _tool_call_cache
+
+    # Retrieve cached tool call for arguments
+    tool_call = _tool_call_cache.get(result.tool_call_id)
+    arguments = tool_call.arguments if tool_call else None
+
     print_tool_result(
         console,
         result.tool_name,
         result.is_success,
-        output=result.to_content()[:100] if result.is_success else None,
+        arguments=arguments,
+        output=result.to_content() if result.is_success else None,
         error=result.error,
     )
+
+    # Clean up cache entry
+    if result.tool_call_id in _tool_call_cache:
+        del _tool_call_cache[result.tool_call_id]
 
 
 async def handle_command(

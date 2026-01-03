@@ -561,6 +561,82 @@ No major known issues. All core features implemented.
   - **Updated Rules**: Modified `entity-creation.md` to recommend `create_directory` instead of `mkdir`
 - Project status: create_directory tool complete, total tools now 13
 
+### Session 8 (2026-01-03)
+- Implemented User-Friendly Tool Call Display
+  - **Issue**: Tool calls showing technical details (method names, all parameters, Python dict format) which was verbose and not user-friendly
+  - **User Request**: "Display like Claude Code - show Write(test001.txt) instead of write_file(file_path='test001.txt', content='...', create_directories=True)"
+  - **Solution**: Created friendly display format with relevant parameters only
+  - **Implementation**:
+    - Created `_format_friendly_tool_call()` helper function in `cli/ui/panels.py`
+    - Maps technical tool names to user-friendly display names
+    - Extracts most relevant parameter for each tool type
+    - Special handling for complex tools (spawn_subtasks, request_clarifications, write_todo)
+  - **Tool Name Mappings**:
+    - `write_file` → `Write(filename)`
+    - `read_file` → `Read(filename)`
+    - `edit_file` → `Edit(filename)`
+    - `create_directory` → `CreateDirectory(path)`
+    - `list_directory` → `List(path)`
+    - `search_files` → `SearchFiles(pattern)`
+    - `search_content` → `SearchContent(pattern)`
+    - `run_command` → `Bash(command)`
+    - `spawn_subtasks` → `Task(spawn N subtasks)`
+    - `request_clarifications` → `AskUserQuestion(N questions)`
+    - `write_todo` → `TodoWrite(N tasks)`
+    - `web_search` → `WebSearch(query)`
+    - `web_fetch` → `WebFetch(url)`
+  - **Debug Mode**: Technical details (full tool name and all parameters) still shown when `ESNAAD_DEBUG=true`
+  - **Benefits**:
+    - Cleaner output for users
+    - Easier to scan tool execution flow
+    - Matches Claude Code UX
+    - Debug info available when needed
+  - **Example Output**:
+    - Before: `→ write_file(file_path='src/test.cs', content='...', create_directories=True)` + `✓ write_file: {"success": true, ...}`
+    - After: `* Write(src/test.cs)` + `L Created 123 bytes to test.cs`
+    - Debug: Technical details shown with `ESNAAD_DEBUG=true`
+- Implemented User-Friendly Tool Result Display
+  - **Issue**: Tool results showing raw technical output/JSON, hard to read and not user-friendly
+  - **User Request**: "Show friendly results like Claude Code - e.g., '* Write(test.txt) └ Wrote 11 bytes to test.txt' with green * for success, red X for errors"
+  - **Solution**: Created friendly result formatter with colored indicators and content previews
+  - **Implementation**:
+    - Created `_format_friendly_tool_result()` helper function in `cli/ui/panels.py`
+    - Updated `print_tool_result()` to show friendly format with colored indicators
+    - Added tool call caching in `chat.py` to preserve original arguments for result display
+    - Tool-specific result formatting for all 13 tools
+  - **Display Format**:
+    ```
+    * Write(test001.txt)          # Green * for success, red X for failure
+      L Created 11 bytes to test001.txt   # Summary line
+         Hello World               # Content preview (if applicable)
+    ```
+  - **Tool-Specific Result Summaries**:
+    - `write_file` → "Created/Wrote N bytes to filename"
+    - `read_file` → "Read N lines from filename" + preview of first 3 lines
+    - `edit_file` → "Made N replacement(s) in filename"
+    - `create_directory` → "Created directory (with parents) dirname"
+    - `list_directory` → "Found N file(s), M dir(s) in dirname" + preview of items
+    - `search_files` → "Found N file(s) matching 'pattern'" + preview of matches
+    - `search_content` → "Found N match(es) for 'pattern'" + preview of matches
+    - `run_command` → "Ran: command" + preview of stdout/stderr
+    - `write_todo` → "Updated todo list (N tasks)"
+    - `spawn_subtasks` → "Completed N/M subtasks"
+    - `request_clarifications` → "Received N answer(s)"
+    - `web_search` → "Found N results for 'query'"
+    - `web_fetch` → "Fetched content from domain" + preview
+  - **Windows Console Compatibility**:
+    - Uses ASCII characters: `*` (success), `X` (error), `L` (summary line)
+    - Avoids Unicode characters that fail on Windows console (●, →, ⎿)
+    - Uses `[D]` and `[F]` instead of emoji for directory/file indicators
+  - **Debug Mode**: Shows full technical output when `ESNAAD_DEBUG=true`
+  - **Benefits**:
+    - Instant visual feedback (green = success, red = error)
+    - Relevant summary information instead of raw JSON
+    - Content previews show what was actually done
+    - Easier to understand what each tool accomplished
+    - Windows console compatible (no encoding errors)
+- Project status: Tool call and result display both improved, full Claude Code UX parity
+
 ## Registered Tools (13 Total)
 
 | Category | Tool | Description |
@@ -575,13 +651,14 @@ No major known issues. All core features implemented.
 | **Shell** | `run_command` | Execute shell commands with timeout |
 | **Orchestration** | `spawn_subtasks` | Execute parallel sub-agents |
 | | `request_clarifications` | Interactive user questionnaire |
+| | `write_todo` | Track task progress with todo lists |
 | **Web** | `web_search` | DuckDuckGo web search |
 | | `web_fetch` | Fetch and extract URL content |
 
 ## Project Summary
 
 Esnaad Code is now a fully functional Claude Code-style agentic system with:
-- **11 tools**: File ops (3), Filesystem (3), Shell (1), Orchestration (2), Web (2)
+- **13 tools**: File ops (3), Filesystem (4), Shell (1), Orchestration (3), Web (2)
 - **Plan Mode**: Toggle via Shift+Tab or /mode to require approval for destructive tools
 - **Parallel execution**: Sub-agent coordination with dependency support
 - **Parallel tool execution**: Parallel-safe tools run concurrently via `asyncio.gather()`
