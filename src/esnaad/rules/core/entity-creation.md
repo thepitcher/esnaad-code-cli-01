@@ -598,11 +598,15 @@ When creating an entity, verify:
   - Bad example: `using System;\n\nusing NextGen...` (extra blank line)
   - Good example: `using System;\nusing NextGen...` (single newline)
 
-- **Directory Creation**: Use Windows commands to create directories if needed:
-  ```cmd
-  mkdir src\modules\NextGen.Maintenance\NextGen.Maintenance.Core\WeightBalance\Entity
-  mkdir src\modules\NextGen.Maintenance\NextGen.Maintenance.Core\Shared\Maintenance\WeightBalance
-  ```
+- **Directory Creation**: Use `create_directory` tool to create directories if needed:
+  - **ALWAYS use** `create_directory` tool instead of `run_command` with `mkdir`
+  - The tool is platform-agnostic, faster, and doesn't require approval
+  - Automatically creates parent directories (like `mkdir -p`)
+  - Example:
+    ```
+    create_directory(path="src/modules/NextGen.Maintenance/NextGen.Maintenance.Core/WeightBalance/Entity")
+    create_directory(path="src/modules/NextGen.Maintenance/NextGen.Maintenance.Core/Shared/Maintenance/WeightBalance")
+    ```
 
 - **Namespace Conventions**: Namespace must match the physical directory structure
 

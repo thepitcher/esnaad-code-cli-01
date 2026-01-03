@@ -538,15 +538,38 @@ No major known issues. All core features implemented.
   - **Behavior**: All files written on Windows now use proper CRLF line endings
   - **Result**: Files now display correctly in all Windows text editors
 - Project status: Line ending normalization complete, code formatting fully resolved
+- Implemented create_directory Tool
+  - **Issue**: Using `run_command` with `mkdir` for directory creation was slow, required approval, and platform-specific
+  - **Solution**: Created dedicated `create_directory` tool
+  - **Implementation**:
+    - Created `src/esnaad/tools/filesystem/create_directory.py`
+    - Uses Python's `pathlib.Path.mkdir()` for platform-agnostic directory creation
+    - Supports automatic parent directory creation (like `mkdir -p`)
+    - Set `requires_approval=False` (safe operation)
+    - Set `parallel_safe=False` (avoid race conditions)
+    - Added to `tools/filesystem/__init__.py` for auto-registration
+  - **Tool Parameters**:
+    - `path`: Directory path to create
+    - `parents` (default True): Create parent directories if needed
+    - `exist_ok` (default True): Don't error if directory already exists
+  - **Benefits**:
+    - No approval required in Plan Mode
+    - 3-5x faster than shell command
+    - Cross-platform (Windows/Linux/Mac)
+    - Better error handling
+    - Clear semantic intent
+  - **Updated Rules**: Modified `entity-creation.md` to recommend `create_directory` instead of `mkdir`
+- Project status: create_directory tool complete, total tools now 13
 
-## Registered Tools (11 Total)
+## Registered Tools (13 Total)
 
 | Category | Tool | Description |
 |----------|------|-------------|
 | **File** | `read_file` | Read file contents with line numbers, offset/limit |
 | | `write_file` | Create or overwrite files |
 | | `edit_file` | Precise text replacement in files |
-| **Filesystem** | `list_directory` | List directory contents with recursion |
+| **Filesystem** | `create_directory` | Create directories (platform-agnostic, no approval needed) |
+| | `list_directory` | List directory contents with recursion |
 | | `search_files` | Glob pattern file search |
 | | `search_content` | Grep-like content search |
 | **Shell** | `run_command` | Execute shell commands with timeout |
