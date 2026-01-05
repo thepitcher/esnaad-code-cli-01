@@ -600,9 +600,10 @@ No major known issues. All core features implemented.
   - **User Request**: "Show friendly results like Claude Code - e.g., '* Write(test.txt) └ Wrote 11 bytes to test.txt' with green * for success, red X for errors"
   - **Solution**: Created friendly result formatter with colored indicators and content previews
   - **Implementation**:
-    - Created `_format_friendly_tool_result()` helper function in `cli/ui/panels.py`
+    - Created `_format_friendly_tool_result()` helper function in `cli/ui/panels.py` (260+ lines)
     - Updated `print_tool_result()` to show friendly format with colored indicators
     - Added tool call caching in `chat.py` to preserve original arguments for result display
+    - Removed duplicate tool call display - now shows only result with colored indicator
     - Tool-specific result formatting for all 13 tools
   - **Display Format**:
     ```
@@ -610,6 +611,10 @@ No major known issues. All core features implemented.
       L Created 11 bytes to test001.txt   # Summary line
          Hello World               # Content preview (if applicable)
     ```
+  - **Key Implementation Details**:
+    - Tool call is cached in `_on_tool_call()` but not displayed
+    - Tool result displays both the friendly name (with args) and the result summary
+    - Single display per tool execution (no duplicates)
   - **Tool-Specific Result Summaries**:
     - `write_file` → "Created/Wrote N bytes to filename"
     - `read_file` → "Read N lines from filename" + preview of first 3 lines
@@ -635,7 +640,17 @@ No major known issues. All core features implemented.
     - Content previews show what was actually done
     - Easier to understand what each tool accomplished
     - Windows console compatible (no encoding errors)
-- Project status: Tool call and result display both improved, full Claude Code UX parity
+    - No duplicate displays - clean, single output per tool
+- **Files Modified**:
+  - `src/esnaad/cli/ui/panels.py` - Added `_format_friendly_tool_call()` and `_format_friendly_tool_result()` helpers, updated `print_tool_call()` and `print_tool_result()`
+  - `src/esnaad/cli/commands/chat.py` - Added `_tool_call_cache` dict, updated `_on_tool_call()` to cache only (not display), updated `_on_tool_result()` to use cached arguments, removed `print_tool_call` import
+  - `DISPLAY_EXAMPLE.md` - Created visual examples of new display format
+- **Testing**:
+  - Created and tested display examples for all 13 tools
+  - Verified success indicators (green `*`) and error indicators (red `X`)
+  - Confirmed Windows console compatibility (ASCII-only characters)
+  - Validated content previews for file operations, directory listings, command output
+- Project status: Tool call and result display both improved, full Claude Code UX parity achieved
 
 ## Registered Tools (13 Total)
 
