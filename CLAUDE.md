@@ -652,6 +652,89 @@ No major known issues. All core features implemented.
   - Validated content previews for file operations, directory listings, command output
 - Project status: Tool call and result display both improved, full Claude Code UX parity achieved
 
+### Session 9 (2026-01-06)
+- Implemented Database Migration Script Creation Rules
+  - **User Request**: Enhance rules to understand and generate SQL migration scripts for entities
+  - **Solution**: Created comprehensive migration script creation guide
+  - **Implementation**:
+    - Created `migration-script-creation.md` (15.6 KB comprehensive rules file)
+    - Covers complete workflow from entity analysis to SQL generation
+    - Includes C# to SQL data type mappings
+    - Documents table naming conventions (MST/HST tables with domain codes)
+    - Defines column naming standards (UPPERCASE with trailing underscore)
+  - **Key Features**:
+    - **Step-by-step workflow**: Read entity → Determine domain code → Generate table names → Map properties to columns
+    - **Domain code mapping**: Maps C# namespaces to 3-letter domain codes (LOG, ADM, MNT, OPS, etc.)
+    - **Table structure templates**: Complete templates for both master (MST) and history (HST) tables
+    - **Data type mapping table**: Comprehensive C# type to SQL Server type mappings with collation rules
+    - **Audit columns support**: Automatic expansion of INgAuditable interface to audit columns
+    - **Index creation rules**: Primary key on ID_, unique index on CODE_ if applicable
+    - **Property type handling**: Entity references, EntityId properties, collections, enums
+    - **Complete example**: UnitOfMeasure entity with generated migration script
+  - **Migration Script Components**:
+    - Master table: `[DOMAIN_CODE]_MST_[ENTITY_NAME]` with all entity properties as columns
+    - History table: `[DOMAIN_CODE]_HST_[ENTITY_NAME]` with fixed audit structure
+    - Primary key: Clustered index on `ID_` column
+    - Unique index: On `CODE_` column if entity has Code property
+    - All string columns: Use `COLLATE Arabic_CI_AS` (case-insensitive Arabic collation)
+    - Standard columns: `ID_` (uniqueidentifier), `VERSION_` (bigint)
+    - Audit columns: 9 audit fields if entity implements INgAuditable
+  - **Rules Integration**:
+    - Added `<!-- #include migration-script-creation.md -->` to `esnaad.md`
+    - Rules automatically loaded with entity-creation and architecture rules
+    - Available to orchestrator and all sub-agents via rules system
+  - **File Location**: Default `db/fw/common` directory
+  - **Flyway Naming Convention**: `V1_[YYYYMMDD]_[HHMM]_[USER_ID]__[USER_STORY_NO or BUG_NO]_[SHORT_DESC].sql`
+    - Uses defaults if not provided: `XXXX` for USER_ID, `US_XXXX` for USER_STORY_NO, `BUG_XXXX` for BUG_NO
+    - Example: `V1_20260106_1430_GAL7634__US_12345_UnitOfMeasure_Table.sql`
+    - Example with defaults: `V1_20260106_1430_XXXX__US_XXXX_UnitOfMeasure_Table.sql`
+  - **Example**: UnitOfMeasure entity generates LOG_MST_UNIT_OF_MEASURE and LOG_HST_UNIT_OF_MEASURE tables
+- Project status: Migration script creation rules complete with Flyway naming, LLM can now generate database migrations
+- Implemented FluentNHibernate Entity Map Creation Rules
+  - **User Request**: Enhance rules to understand Hibernate entity mapping creation
+  - **Solution**: Created comprehensive entity-map-creation guide for FluentNHibernate mappings
+  - **Implementation**:
+    - Created `entity-map-creation.md` (19.6 KB comprehensive rules file)
+    - Covers complete workflow from entity analysis to map file generation
+    - Documents property type to NHibernate mapping method translation
+    - Includes detailed decision trees and validation checklists
+  - **Key Features**:
+    - **Step-by-step workflow**: Read entity → Determine domain/module → Map properties → Generate map file
+    - **Complete mapping rules**: 12 property types (ID, Version, String, Boolean, Integer, Decimal, DateTime, Enum/ObjectId, AuditEntry, Entity references, EntityId properties, Collections)
+    - **Mapping method patterns**:
+      - `CompositeId(x => x.Id).KeyProperty(x => x.Value, "ID_")` for entity IDs
+      - `Version(x => x.Version).Column("VERSION_")` for version tracking
+      - `Map(x => x.PropertyName, "COLUMN_NAME_")` for primitives and EntityId properties
+      - `References(x => x.PropertyName, "COLUMN_ID_")` for entity references
+      - `Component(x => x.AuditEntry)` for audit entries
+      - `HasMany(x => x.PropertyName)` for collections
+    - **Column naming convention**: UPPERCASE with trailing underscore (e.g., `CODE_`, `NAME_`, `IS_ACTIVE_`)
+    - **Nullable handling**: `.Not.Nullable()` for required fields, omit for nullable types
+    - **String length rules**: `.Length(N)` for strings (Code: 50, Name: 100, Description: 500)
+    - **Entity vs EntityId distinction**:
+      - Entity references (e.g., `DataRestriction Command`) → `References()`
+      - EntityId properties (e.g., `DataRestrictionId CommandId`) → `Map()`
+    - **Template structure**: Complete ClassMap template with pragma warnings, author tag, cache strategy
+    - **File location pattern**: `NextGen.[Domain].Core/Config/EntityMap/[Module]/[EntityName]Map.cs`
+    - **Table naming**: `[DOMAIN_CODE]_MST_[ENTITY_NAME]` (matches migration script pattern)
+    - **Cache strategy**: `Cache.NonStrictReadWrite().Region(CacheRegionConstant.UpdateableMaster)`
+  - **Complete Examples**:
+    - UnitOfMeasure: Basic entity with primitives, enums, and audit entry
+    - WeightBalance: Entity with entity references (Command, Platform)
+    - MasterEquipment: Entity with EntityId properties (CommandId, PlatformId, ItemId)
+  - **Decision Tree**: Quick reference for property type → mapping method selection
+  - **Common Mistakes Section**: Highlights errors to avoid (incorrect column names, wrong mapping methods, missing length modifiers)
+  - **Validation Checklist**: 25-point checklist covering preparation, structure, mappings, imports, and final checks
+  - **Rules Integration**:
+    - Added `<!-- #include entity-map-creation.md -->` to `esnaad.md`
+    - Rules automatically loaded with entity-creation and migration-script rules
+    - Available to orchestrator and all sub-agents via rules system
+  - **Mapping Generation Triggers**:
+    - "Create entity map for [EntityName]"
+    - "Create Hibernate mapping for [EntityName]"
+    - "Map [EntityName] entity to database"
+- Project status: Entity map creation rules complete, LLM can now generate FluentNHibernate ClassMap files
+
 ## Registered Tools (13 Total)
 
 | Category | Tool | Description |
