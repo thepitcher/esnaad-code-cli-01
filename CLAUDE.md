@@ -734,6 +734,64 @@ No major known issues. All core features implemented.
     - "Create Hibernate mapping for [EntityName]"
     - "Map [EntityName] entity to database"
 - Project status: Entity map creation rules complete, LLM can now generate FluentNHibernate ClassMap files
+- Implemented NHibernate Repository Creation Rules
+  - **User Request**: Enhance rules to understand repository creation for entities
+  - **Solution**: Created comprehensive repository-creation guide for NHibernate data access layer
+  - **Implementation**:
+    - Created `repository-creation.md` (23.5 KB comprehensive rules file)
+    - Covers complete workflow from entity analysis to repository generation
+    - Documents interface and implementation patterns
+    - Includes NHibernate QueryOver API usage patterns
+  - **Key Features**:
+    - **Step-by-step workflow**: Read entity → Identify properties → Generate interface → Generate implementation
+    - **Two-file pattern**: Interface (`I[EntityName]Repository`) + Implementation (`Nh[EntityName]Repository`)
+    - **Base types**:
+      - Interface extends: `ISpecificRepository<[EntityName], [EntityName]Id>`
+      - Implementation extends: `AbstractNhSpecificRepository<[EntityName], [EntityName]Id>`
+      - Implementation implements: `I[EntityName]Repository`
+    - **Standard methods (auto-included based on entity properties)**:
+      - `Get(Guid guid)` - Always included (converts Guid to EntityId)
+      - `Find([EntityName]Id[] ids)` - Always included (find by array of IDs)
+      - `IsCodeExists(string code)` - If entity has Code property
+      - `Get(string code)` - If entity has Code property
+      - `Find(string[] codes)` - If entity has Code property
+      - `IsNameExists(string name)` - If entity has Name property
+    - **NHibernate QueryOver patterns**:
+      - Single result: `.Where(x => x.Property == value).SingleOrDefault<T>()`
+      - Existence check: `.Where(x => x.Property == value).Future().Any()`
+      - Array filtering: `.WhereRestrictionOn(x => x.Property).IsIn(array).Future()`
+      - Deferred execution: `.Future()` for collections
+    - **Constructor pattern**: Takes `ISessionFactory sessionFactory`, calls `base(sessionFactory)`
+    - **ReSharper comments**: Required for covariant array conversion warnings
+    - **File locations**:
+      - Interface: `NextGen.[Domain].Core/[Module]/Repository/I[EntityName]Repository.cs`
+      - Implementation: `NextGen.[Domain].Core/[Module]/Repository/NHibernate/Nh[EntityName]Repository.cs`
+    - **Namespace pattern**:
+      - Interface: `NextGen.[Domain].Core.[Module].Repository`
+      - Implementation: `NextGen.[Domain].Core.[Module].Repository.NHibernate`
+    - **Parameter naming convention**: `[entityName]Ids` (camelCase, plural + "Ids")
+      - Example: `unitOfMeasureIds`, `platformIds`, `dataRestrictionIds`
+  - **Complete Examples**:
+    - UnitOfMeasure: Entity with Code and Name (full standard methods)
+    - WeightBalance: Entity without Code (minimal methods)
+  - **NHibernate Query Pattern Library**:
+    - Single result by property
+    - Check existence
+    - Find by array (IN clause)
+    - Find with multiple criteria
+    - Find with ordering
+  - **Common Mistakes Section**: Highlights errors to avoid (wrong base types, missing .Future(), incorrect .Any() usage)
+  - **Decision Tree**: Property-based method inclusion logic
+  - **Validation Checklist**: 32-point checklist covering preparation, interface, implementation, imports, and final checks
+  - **Rules Integration**:
+    - Added `<!-- #include repository-creation.md -->` to `esnaad.md`
+    - Rules automatically loaded with entity, map, and migration rules
+    - Available to orchestrator and all sub-agents via rules system
+  - **Repository Generation Triggers**:
+    - "Create repository for [EntityName]"
+    - "Implement repository for [EntityName] entity"
+    - "Create data access layer for [EntityName]"
+- Project status: Repository creation rules complete, LLM can now generate NHibernate repository interfaces and implementations
 
 ## Registered Tools (13 Total)
 
