@@ -792,6 +792,37 @@ No major known issues. All core features implemented.
     - "Implement repository for [EntityName] entity"
     - "Create data access layer for [EntityName]"
 - Project status: Repository creation rules complete, LLM can now generate NHibernate repository interfaces and implementations
+- Enhanced Entity Creation Rules with Interactive Workflow
+  - **User Request**: Enhance entity creation to ask about related files (map, repository, migration script)
+  - **Solution**: Added Step 0 to entity-creation rules that prompts user for complete implementation preference
+  - **Implementation**:
+    - Updated `entity-creation.md` with new "Step 0: Ask About Related Files (REQUIRED)" section
+    - LLM now uses `AskUserQuestion` tool before starting entity creation
+    - Four options provided to user:
+      1. **Entity only** - Just ID + Entity classes
+      2. **Entity + Map** - ID, Entity, and EntityMap
+      3. **Entity + Map + Repository** - ID, Entity, EntityMap, Repository (interface + implementation)
+      4. **Complete (All + Migration)** (Recommended) - All files including migration script
+  - **Workflow based on user choice**:
+    - **Entity only**: Creates ID and Entity classes (original behavior)
+    - **Entity + Map**: Creates entity files, then follows `entity-map-creation.md` rules
+    - **Entity + Map + Repository**: Creates entity, map, then follows `repository-creation.md` rules
+    - **Complete**: Creates entity, map, repository, then follows `migration-script-creation.md` rules
+  - **Execution Order**: Entity → EntityMap → Repository → Migration Script
+  - **Updated Checklist**: Added "Pre-Creation" step 0 to verify user was asked about related files
+  - **Notes Section**: Added "Follow-up with Related Files" guidance explaining the conditional workflow
+  - **Benefits**:
+    - User gets to choose implementation scope upfront
+    - No need to make separate requests for each file type
+    - Ensures correct creation order (dependencies)
+    - Reduces back-and-forth conversation
+    - Single request can create complete entity stack
+  - **Example Usage**:
+    - User: "Create UnitOfMeasure entity in Logistic domain"
+    - LLM: Asks user about related files using AskUserQuestion
+    - User: Selects "Complete (All + Migration)"
+    - LLM: Creates ID class → Entity class → EntityMap → Repository → Migration Script
+- Project status: Entity creation workflow enhanced with interactive related files prompt
 
 ## Registered Tools (13 Total)
 

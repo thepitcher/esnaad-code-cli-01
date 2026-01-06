@@ -11,6 +11,38 @@
 
 ---
 
+## Step 0: Ask About Related Files (REQUIRED)
+
+**BEFORE starting entity creation, ALWAYS ask the user:**
+
+Use the `AskUserQuestion` tool to ask if they want to create all related files for a complete entity implementation.
+
+**Question to ask:**
+```
+"Would you like me to create all related files for this entity?"
+```
+
+**Options to provide:**
+1. **"Entity only" (Just ID + Entity classes)** - Creates only the ID class and Entity class
+2. **"Entity + Map" (Add Hibernate mapping)** - Creates ID, Entity, and EntityMap
+3. **"Entity + Map + Repository" (Add data access)** - Creates ID, Entity, EntityMap, and Repository (interface + implementation)
+4. **"Complete (All + Migration)" (Recommended)** - Creates ID, Entity, EntityMap, Repository, and Migration Script
+
+**Implementation based on user choice:**
+
+- **Entity only**: Follow steps 1-3 below (create ID and Entity classes only)
+- **Entity + Map**: Follow steps 1-3, then use `entity-map-creation.md` rules to create the EntityMap
+- **Entity + Map + Repository**: Follow steps 1-3, then use `entity-map-creation.md` and `repository-creation.md` rules
+- **Complete (All + Migration)**: Follow steps 1-3, then use `entity-map-creation.md`, `repository-creation.md`, and `migration-script-creation.md` rules
+
+**Important:**
+- If user chooses any option beyond "Entity only", you MUST create the entity files first (steps 1-3)
+- Then proceed to create the additional files using the respective rule files
+- Follow the order: Entity → EntityMap → Repository → Migration Script
+- Each step depends on the previous one being completed
+
+---
+
 ## Step-by-Step Workflow
 
 ### Step 1: Identify Location
@@ -559,6 +591,10 @@ namespace NextGen.Maintenance.Core.WeightBalance.Entity
 
 When creating an entity, verify:
 
+### Pre-Creation
+0. ☐ Asked user about related files using `AskUserQuestion` tool
+   - Options: Entity only / Entity + Map / Entity + Map + Repository / Complete (All + Migration)
+
 ### Structure
 1. ☐ Determined correct Domain and Module
 2. ☐ Created ID class in `Shared/[Domain]/[Module]/` directory
@@ -611,3 +647,10 @@ When creating an entity, verify:
 - **Namespace Conventions**: Namespace must match the physical directory structure
 
 - **Always Create Both Files**: An entity is incomplete without its ID class
+
+- **Follow-up with Related Files**: After creating the entity (ID + Entity classes):
+  - If user chose **"Entity + Map"**: Proceed to create the EntityMap using `entity-map-creation.md` rules
+  - If user chose **"Entity + Map + Repository"**: Create EntityMap first, then Repository using `repository-creation.md` rules
+  - If user chose **"Complete (All + Migration)"**: Create EntityMap, then Repository, then Migration Script using `migration-script-creation.md` rules
+  - **CRITICAL**: Always create files in order: Entity → EntityMap → Repository → Migration Script
+  - Each subsequent file depends on the previous ones being created first
