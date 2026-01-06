@@ -1,6 +1,7 @@
 """ReAct (Reasoning + Acting) loop implementation."""
 
 import asyncio
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable
@@ -290,7 +291,7 @@ class ReActLoop:
                     "type": "function",
                     "function": {
                         "name": tc.name,
-                        "arguments": str(tc.arguments),
+                        "arguments": json.dumps(tc.arguments),
                     },
                 }
                 for tc in response.tool_calls
