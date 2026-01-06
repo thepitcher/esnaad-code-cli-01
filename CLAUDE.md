@@ -823,6 +823,12 @@ No major known issues. All core features implemented.
     - User: Selects "Complete (All + Migration)"
     - LLM: Creates ID class → Entity class → EntityMap → Repository → Migration Script
 - Project status: Entity creation workflow enhanced with interactive related files prompt
+- Increased Default Orchestrator Timeout
+  - **Issue**: 5-minute timeout was too short for complex entity creation workflows (entity + map + repository + migration)
+  - **Solution**: Increased `DEFAULT_TIMEOUT_SECONDS` from 300s (5 min) to 1800s (30 min)
+  - **File Changed**: `src/esnaad/config/constants.py` line 6
+  - **Benefit**: Gives LLM adequate time to complete complex workflows, including multiple file creation, analysis, and retries
+  - **Note**: Can still be overridden via environment variable `ESNAAD_ORCHESTRATOR__TIMEOUT_SECONDS` or `.env` file
 
 ## Registered Tools (13 Total)
 
