@@ -50,8 +50,10 @@ Esnaad is a **legacy .NET Framework 4.0.1 enterprise application** for military 
 
 <!-- #include repository-creation.md -->
 
+<!-- #include csproj-update.md -->
+
 <!-- #include migration-script-creation.md -->
 
-<!-- #-include code-style.md -->
+<!-- #include code-style.md -->
 
-<!-- #-include workflow.md -->
+<!-- #include workflow.md -->4

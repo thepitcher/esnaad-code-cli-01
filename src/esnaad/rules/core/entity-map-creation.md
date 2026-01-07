@@ -10,6 +10,8 @@
 
 **You MUST follow the complete workflow below.**
 
+**CRITICAL:** After creating the entity map file, you MUST update the .csproj file to include it in the project. See `csproj-update.md` for detailed instructions.
+
 ---
 
 ## Step-by-Step Workflow
@@ -674,6 +676,7 @@ When creating an entity map, verify:
 ### Final
 24. ☐ Used `write_file` tool to create map file
 25. ☐ Verified correct namespace in file
+26. ☐ **Updated .csproj to include map file** (`Config\EntityMap\[Module]\[EntityName]Map.cs`)
 
 ---
 

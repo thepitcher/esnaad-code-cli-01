@@ -62,6 +62,8 @@ Entity Class: src/modules/NextGen.[Domain]/NextGen.[Domain].Core/[Module]/Entity
 
 **ALWAYS create the ID class before the entity class.**
 
+**CRITICAL:** After creating the ID class file, **immediately update the .csproj file** to include it in the project. See `csproj-update.md` for details.
+
 **Template:**
 ```csharp
 // Location: NextGen.[Domain].Core/Shared/[Domain]/[Module]/[EntityName]Id.cs
@@ -83,6 +85,8 @@ namespace NextGen.[Domain].Core.Shared.[Domain].[Module]
 ```
 
 ### Step 3: Create Entity Class
+
+**CRITICAL:** After creating the Entity class file, **immediately update the .csproj file** to include it in the project. See `csproj-update.md` for details.
 
 **Template:**
 ```csharp
@@ -621,6 +625,8 @@ When creating an entity, verify:
 17. ☐ Correct namespaces used
 18. ☐ All imports resolved correctly
 19. ☐ Used `write_file` tool to create both files
+20. ☐ **Updated .csproj to include ID class** (`Shared\[Domain]\[Module]\[EntityName]Id.cs`)
+21. ☐ **Updated .csproj to include Entity class** (`[Module]\Entity\[EntityName].cs`)
 
 ---
 

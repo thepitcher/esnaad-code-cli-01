@@ -10,6 +10,8 @@
 
 **You MUST follow the complete workflow below.**
 
+**CRITICAL:** After creating repository files (interface and implementation), you MUST update the .csproj file to include both files in the project. See `csproj-update.md` for detailed instructions.
+
 ---
 
 ## Step-by-Step Workflow
@@ -828,6 +830,8 @@ When creating a repository, verify:
 30. ☐ Used `write_file` tool to create interface file
 31. ☐ Used `write_file` tool to create implementation file
 32. ☐ Verified correct namespaces in both files
+33. ☐ **Updated .csproj to include interface** (`[Module]\Repository\I[EntityName]Repository.cs`)
+34. ☐ **Updated .csproj to include implementation** (`[Module]\Repository\NHibernate\Nh[EntityName]Repository.cs`)
 
 ---
 
